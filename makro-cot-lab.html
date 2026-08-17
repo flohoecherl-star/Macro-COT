@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Makro &amp; COT Lab — Daten lesen, News beurteilen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F7F4EE;
+  --paper-2:#FFFDF8;
+  --ink:#1B1917;
+  --muted:#6E675C;
+  --rule:#DFD8C9;
+  --rule-soft:#EBE5D9;
+  --navy:#1F3A5F;
+  --bull:#2E6B4F;
+  --bear:#A33B32;
+  --amber:#B5852B;
+  --shadow:0 1px 0 rgba(27,25,23,.06), 0 8px 24px -18px rgba(27,25,23,.5);
+  --mono:'JetBrains Mono', ui-monospace, Menlo, monospace;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'Inter', system-ui, sans-serif;
+  font-size:15px; line-height:1.55;
+  padding-bottom:88px;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:820px; margin:0 auto; padding:0 16px}
+
+/* ---------- Kopf: Wire-Ticker Anmutung ---------- */
+header.masthead{
+  border-bottom:1.5px solid var(--ink);
+  padding:22px 0 12px; margin-bottom:18px;
+}
+.masthead .kicker{
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--muted); display:flex; justify-content:space-between; gap:12px;
+}
+.masthead h1{
+  font-family:'Fraunces', Georgia, serif; font-weight:600;
+  font-size:clamp(28px,7vw,42px); line-height:1.02; margin:8px 0 6px; letter-spacing:-.02em;
+}
+.masthead p{margin:0; color:var(--muted); font-size:13.5px; max-width:56ch}
+
+/* ---------- Tabs ---------- */
+nav.tabs{
+  position:sticky; top:0; z-index:40; background:var(--paper);
+  border-bottom:1px solid var(--rule); margin:0 -16px 20px; padding:0 8px;
+  overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;
+}
+nav.tabs::-webkit-scrollbar{display:none}
+.tabrow{display:flex; gap:2px; min-width:max-content}
+.tab{
+  appearance:none; border:0; background:none; cursor:pointer;
+  font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--muted); padding:12px 10px; border-bottom:2px solid transparent; white-space:nowrap;
+}
+.tab[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--navy); font-weight:700}
+.tab:focus-visible{outline:2px solid var(--navy); outline-offset:-2px}
+
+section.view{display:none; animation:fade .18s ease-out}
+section.view.on{display:block}
+@keyframes fade{from{opacity:0; transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ---------- Bausteine ---------- */
+h2.sec{
+  font-family:'Fraunces',serif; font-weight:600; font-size:24px; letter-spacing:-.01em;
+  margin:32px 0 4px;
+}
+h2.sec:first-child{margin-top:4px}
+.sec-note{color:var(--muted); font-size:13px; margin:0 0 16px}
+h3{font-family:'Fraunces',serif; font-weight:600; font-size:18px; margin:22px 0 6px}
+p{margin:0 0 12px}
+ul{margin:0 0 12px; padding-left:18px}
+li{margin-bottom:5px}
+strong{font-weight:600}
+code{font-family:var(--mono); font-size:12.5px; background:var(--rule-soft); padding:1px 5px; border-radius:3px}
+.eyebrow{
+  font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--muted); margin-bottom:6px;
+}
+.card{
+  background:var(--paper-2); border:1px solid var(--rule); border-radius:2px;
+  padding:16px 16px 14px; margin-bottom:14px; box-shadow:var(--shadow);
+}
+.card.tight{padding:12px 14px}
+.callout{border-left:3px solid var(--navy); background:var(--paper-2); padding:12px 14px; margin:14px 0; font-size:14px}
+.callout.warn{border-left-color:var(--bear)}
+.callout.win{border-left-color:var(--bull)}
+.callout .lbl{font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:4px}
+
+/* Datenzeile: Signature-Element */
+.wire{
+  border-top:1.5px solid var(--ink); border-bottom:1px solid var(--rule);
+  display:grid; grid-template-columns:repeat(3,1fr); font-family:var(--mono);
+  margin:10px 0 12px;
+}
+.wire div{padding:8px 10px; border-right:1px solid var(--rule-soft)}
+.wire div:last-child{border-right:0}
+.wire .k{font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); display:block}
+.wire .v{font-size:14px; font-weight:700}
+.impact{display:inline-flex; gap:3px; vertical-align:middle; margin-left:6px}
+.impact i{width:6px; height:6px; border-radius:50%; background:var(--rule); display:block}
+.impact i.on{background:var(--bear)}
+
+table{width:100%; border-collapse:collapse; font-size:13.5px; margin:0 0 14px}
+th,td{text-align:left; padding:8px 8px 8px 0; border-bottom:1px solid var(--rule-soft); vertical-align:top}
+th{font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:500}
+td.num{font-family:var(--mono); text-align:right; padding-right:0}
+
+.pill{
+  display:inline-block; font-family:var(--mono); font-size:10px; letter-spacing:.08em;
+  text-transform:uppercase; padding:3px 7px; border:1px solid var(--rule); border-radius:2px; color:var(--muted);
+}
+.pill.bull{color:var(--bull); border-color:var(--bull)}
+.pill.bear{color:var(--bear); border-color:var(--bear)}
+.pill.navy{color:var(--navy); border-color:var(--navy)}
+.pill.amber{color:var(--amber); border-color:var(--amber)}
+
+button.act{
+  appearance:none; cursor:pointer; font-family:var(--mono); font-size:11.5px; letter-spacing:.08em;
+  text-transform:uppercase; background:var(--ink); color:var(--paper); border:1px solid var(--ink);
+  padding:10px 14px; border-radius:2px;
+}
+button.act.ghost{background:none; color:var(--ink)}
+button.act:disabled{opacity:.4; cursor:default}
+button.act:focus-visible{outline:2px solid var(--navy); outline-offset:2px}
+
+input[type=number],input[type=text],select{
+  font-family:var(--mono); font-size:14px; background:var(--paper-2); color:var(--ink);
+  border:1px solid var(--rule); border-radius:2px; padding:9px 10px; width:100%;
+}
+input:focus,select:focus{outline:2px solid var(--navy); outline-offset:-1px}
+label.fl{font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:4px}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.grid3{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
+@media(max-width:520px){.grid3{grid-template-columns:1fr 1fr}}
+
+details.mod{border:1px solid var(--rule); background:var(--paper-2); border-radius:2px; margin-bottom:10px}
+details.mod summary{
+  cursor:pointer; padding:13px 14px; list-style:none; display:flex; align-items:baseline; gap:10px;
+  font-family:'Fraunces',serif; font-size:16.5px; font-weight:600;
+}
+details.mod summary::-webkit-details-marker{display:none}
+details.mod summary .idx{font-family:var(--mono); font-size:11px; color:var(--muted); font-weight:400}
+details.mod[open] summary{border-bottom:1px solid var(--rule-soft)}
+details.mod .body{padding:14px 14px 4px}
+.done-dot{margin-left:auto; font-family:var(--mono); font-size:10px; color:var(--bull)}
+
+.search{margin-bottom:14px}
+.filterrow{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px}
+.chip{
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase;
+  border:1px solid var(--rule); background:var(--paper-2); padding:6px 9px; border-radius:2px;
+  cursor:pointer; color:var(--muted);
+}
+.chip[aria-pressed="true"]{background:var(--ink); color:var(--paper); border-color:var(--ink)}
+
+.opt{
+  display:block; width:100%; text-align:left; background:var(--paper-2); border:1px solid var(--rule);
+  border-radius:2px; padding:11px 12px; margin-bottom:8px; cursor:pointer; font:inherit; font-size:14px; color:var(--ink);
+}
+.opt:hover{border-color:var(--muted)}
+.opt.right{border-color:var(--bull); background:rgba(46,107,79,.07)}
+.opt.wrong{border-color:var(--bear); background:rgba(163,59,50,.07)}
+.opt:disabled{cursor:default}
+
+.scorebar{display:flex; justify-content:space-between; align-items:center; font-family:var(--mono); font-size:11px; color:var(--muted); margin-bottom:12px}
+.prog{height:3px; background:var(--rule-soft); margin-bottom:16px}
+.prog i{display:block; height:100%; background:var(--navy); width:0%; transition:width .3s}
+
+canvas{width:100%; height:auto; display:block}
+.foot{border-top:1px solid var(--rule); margin-top:40px; padding:16px 0 30px; color:var(--muted); font-size:12px; font-family:var(--mono)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <div class="kicker"><span>Makro · News · Positionierung</span><span id="hdrDate"></span></div>
+  <h1>Makro &amp; COT Lab</h1>
+  <p>Wie Zahlen, Zentralbanken und Positionierung den Index-Future bewegen — und wie du eine Meldung in Sekunden einordnest, statt sie zu handeln.</p>
+</header>
+
+<nav class="tabs" aria-label="Bereiche">
+  <div class="tabrow" id="tabrow"></div>
+</nav>
+
+<section class="view" id="v-motor"></section>
+<section class="view" id="v-indi"></section>
+<section class="view" id="v-lesen"></section>
+<section class="view" id="v-news"></section>
+<section class="view" id="v-cot"></section>
+<section class="view" id="v-rechner"></section>
+<section class="view" id="v-trainer"></section>
+<section class="view" id="v-quiz"></section>
+<section class="view" id="v-routine"></section>
+<section class="view" id="v-playbook"></section>
+
+<div class="foot">
+  Lokal gespeichert · kein Server · <span id="resetLink" style="cursor:pointer; text-decoration:underline">Fortschritt zurücksetzen</span>
+</div>
+</div>
+<script>
+/* ============================================================
+   STATE
+   ============================================================ */
+const KEY='makro_cot_lab_v1';
+let S = JSON.parse(localStorage.getItem(KEY) || '{}');
+S.read = S.read || {};        // gelesene Module
+S.quiz = S.quiz || {best:0, runs:0};
+S.train = S.train || {right:0, total:0};
+S.cot  = S.cot  || {rows:[]}; // COT-Historie
+const save = ()=>localStorage.setItem(KEY, JSON.stringify(S));
+const $ = s=>document.querySelector(s);
+const esc = s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+document.getElementById('hdrDate').textContent =
+  new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'short',year:'numeric'});
+
+/* ============================================================
+   1) MAKRO-MOTOR
+   ============================================================ */
+const MOTOR = [
+{t:'Was den Index-Future überhaupt bewegt', b:`
+<p>Ein Aktienindex ist nichts anderes als <em>erwartete künftige Gewinne, abgezinst mit einem Zins, korrigiert um eine Risikoprämie</em>. Alle drei Größen ändern sich mit Makrodaten — deshalb reagiert der NQ auf Zahlen, die mit Tech-Unternehmen scheinbar nichts zu tun haben.</p>
+<table>
+<tr><th>Kanal</th><th>Was sich ändert</th><th>Wirkung auf NQ</th></tr>
+<tr><td>Diskontierung</td><td>Realzins, 10y-Rendite, Terminal Rate</td><td>Der stärkste Hebel. Lange Duration = Wachstumsaktien reagieren überproportional auf Zinsen.</td></tr>
+<tr><td>Gewinne</td><td>Nominales Wachstum, Margen, Konsum</td><td>Gute Konjunktur = höhere Gewinne, aber nur wenn keine Zinsreaktion folgt.</td></tr>
+<tr><td>Risikoprämie</td><td>Unsicherheit, Kredit-Spreads, Vol</td><td>Krisen, Geopolitik, Bankenstress: Multiple fällt, unabhängig von Gewinnen.</td></tr>
+<tr><td>Liquidität</td><td>Bilanz der Fed, Reserven, TGA, RRP</td><td>Langsam wirkend, erklärt Trends über Wochen bis Quartale, nicht die Reaktion um 14:30.</td></tr>
+</table>
+<div class="callout"><span class="lbl">Kern</span>Der NQ ist der zinssensitivste der großen US-Index-Futures. Wenn du zwischen ES und NQ wählst: dieselbe Nachricht bewegt NQ typischerweise stärker, weil Duration und Gewichtung der Mega-Caps hebeln.</div>`},
+
+{t:'Wachstum × Inflation: die vier Quadranten', b:`
+<p>Ordne jede Zahl, die reinkommt, in ein 2×2-Raster ein. Das ist die schnellste Art, aus einem Datenpunkt eine Erwartung zu machen.</p>
+<table>
+<tr><th></th><th>Inflation fällt</th><th>Inflation steigt</th></tr>
+<tr><td><strong>Wachstum steigt</strong></td><td><span class="pill bull">Goldilocks</span> Bestes Umfeld für Aktien. Gewinne hoch, Zinsdruck runter.</td><td><span class="pill amber">Überhitzung</span> Aktien laufen, bis der Markt die Fed einpreist. Kippt oft abrupt.</td></tr>
+<tr><td><strong>Wachstum fällt</strong></td><td><span class="pill navy">Disinflationärer Abschwung</span> Anleihen steigen, Aktien uneindeutig: Zinsentlastung vs. Gewinnsorgen.</td><td><span class="pill bear">Stagflation</span> Schlechtestes Umfeld. Keine Rettung durch die Fed.</td></tr>
+</table>
+<h3>Warum dieselbe Zahl mal gut und mal schlecht ist</h3>
+<p>Der Markt hat eine <strong>Reaktionsfunktion</strong>, und die wechselt in Regimen:</p>
+<ul>
+<li><strong>Inflations-Regime</strong> („good news is bad news"): Starke Arbeitsmarktdaten drücken Aktien, weil sie höhere Zinsen bedeuten. Typisch 2022–2023.</li>
+<li><strong>Wachstums-Regime</strong> („good news is good news"): Starke Daten heben Aktien, weil eine Rezession vom Tisch ist. Typisch in Abkühlungsphasen mit bereits gefallener Inflation.</li>
+</ul>
+<p>Erkennen kannst du das Regime an einer einzigen Beobachtung: <strong>Wie korrelieren Anleihen und Aktien heute?</strong> Fallen Kurse von Anleihen und Aktien gemeinsam bei starken Daten, bist du im Inflations-Regime. Steigen Aktien während Renditen steigen, dominiert Wachstum.</p>
+<div class="callout warn"><span class="lbl">Häufigster Fehler</span>Die Reaktionsfunktion aus dem letzten Jahr auf die heutige Zahl anwenden. Prüfe das Regime, bevor du eine Richtung ableitest — nicht danach.</div>`},
+
+{t:'Die Fed als eigentlicher Gegenspieler', b:`
+<p>Zwischen den Sitzungen handelt der Markt nicht die Fed, sondern <strong>Erwartungen an die Fed</strong>. Diese Erwartungen stehen in den Fed-Funds-Futures und in SOFR-Futures und lassen sich als implizite Wahrscheinlichkeiten lesen (CME FedWatch).</p>
+<h3>Das Mandat</h3>
+<ul>
+<li><strong>Preisstabilität</strong>: Ziel 2 % gemessen am <em>Core PCE</em> — nicht am CPI. Der CPI bewegt den Markt trotzdem stärker, weil er früher kommt.</li>
+<li><strong>Maximale Beschäftigung</strong>: Arbeitslosenquote, Partizipation, Lohnwachstum.</li>
+</ul>
+<h3>Was du vor jeder Zahl wissen musst</h3>
+<ul>
+<li>Wie viele Zinsschritte sind bis Jahresende eingepreist?</li>
+<li>Welche der beiden Mandatshälften dominiert gerade die Rhetorik?</li>
+<li>Wo steht die 2-jährige Rendite? Sie ist die reinste Fed-Erwartung. Bewegt sich der 2y-Yield nach einer Zahl kaum, war die Zahl für die Fed irrelevant — egal wie laut die Schlagzeile war.</li>
+</ul>
+<div class="callout"><span class="lbl">Praktisch</span>Nutze den 2-Jahres-Yield als Bestätigungsinstrument. Reaktion im NQ ohne Reaktion im 2y ist meist Positionierungs-Rauschen und läuft öfter zurück.</div>`},
+
+{t:'Liquidität und Angebot: der langsame Strom', b:`
+<p>Diese Faktoren erklären keine 5-Minuten-Kerze, aber sie erklären, warum Rücksetzer wochenlang gekauft oder verkauft werden.</p>
+<ul>
+<li><strong>QT / QE</strong>: Schrumpft die Fed-Bilanz, verschwinden Reserven aus dem System. Wirkt wie ein dauerhafter Gegenwind.</li>
+<li><strong>TGA</strong> (Konto des US-Finanzministeriums bei der Fed): Füllt es sich, wird dem Markt Liquidität entzogen. Leert es sich, fließt sie zurück.</li>
+<li><strong>Refunding-Ankündigungen</strong>: Wie viel Anleihe-Emission kommt, und vor allem am kurzen oder langen Ende? Viel Langläufer-Angebot drückt Kurse, hebt Renditen, belastet Duration und damit den NQ.</li>
+<li><strong>Auktionen</strong> (v. a. 10y und 30y, meist 13:00 ET): Schwache Auktion → Renditen springen → NQ oft sofort schwächer. Ein unterschätzter Intraday-Katalysator am Nachmittag.</li>
+</ul>`},
+
+{t:'Vom Makro zum Trade: was davon überhaupt handelbar ist', b:`
+<p>Ehrliche Einordnung, bevor du Zeit investierst:</p>
+<table>
+<tr><th>Ebene</th><th>Horizont</th><th>Nutzen für dich</th></tr>
+<tr><td>Liquidität, Fiskalpolitik</td><td>Monate</td><td>Bias, Größe der Rücksetzer, Erwartung an Trendtage</td></tr>
+<tr><td>Regime (Wachstum vs. Inflation)</td><td>Wochen</td><td>Richtung der Reaktionsfunktion — welche Zahl gut oder schlecht ist</td></tr>
+<tr><td>Positionierung (COT, Optionen)</td><td>Tage bis Wochen</td><td>Wie voll ist der Trade? Wo liegt das Squeeze-Risiko?</td></tr>
+<tr><td>Einzelne Datenveröffentlichung</td><td>Minuten bis Stunden</td><td>Volatilitätsfenster, Levels werden getestet, Regimewechsel im Tageschart</td></tr>
+</table>
+<div class="callout win"><span class="lbl">Die nützlichste Übersetzung</span>Makro sagt dir nicht, wo du einsteigst. Es sagt dir, <strong>ob heute ein Tag ist, an dem Levels halten oder brechen</strong> — und genau das ist die Frage, die dein Regime-Ansatz ohnehin stellt. Ein High-Impact-Release ist strukturell ein Breakout-Katalysator: er liefert genau die Information, die vorher nicht im Preis stand.</div>`}
+];
+
+/* ============================================================
+   2) INDIKATOREN-DATENBANK
+   ============================================================ */
+const IND = [
+{n:'CPI — Verbraucherpreise', cat:'Inflation', imp:5, src:'BLS', when:'ca. 10.–15. des Folgemonats, 8:30 ET (14:30 dt.)',
+ what:'Preisentwicklung eines Warenkorbs der Haushalte. Headline inkl. Energie/Nahrung, Core ohne beides.',
+ look:'Core MoM auf zwei Nachkommastellen. Der Markt handelt die Abweichung im Kern, nicht die Schlagzeile. Danach: Supercore (Dienstleistungen ohne Wohnen) und Shelter, weil Shelter mit Verzögerung reagiert und den Kern künstlich hochhält.',
+ react:'Core über Konsens → Renditen hoch, NQ runter. Unter Konsens → Erleichterungsrally. Die erste Bewegung ist oft algorithmisch und wird in den ersten 10–20 Minuten mindestens einmal getestet.',
+ trap:'Rundung. 0,349 wird als 0,3 gedruckt, 0,351 als 0,4 — bei identischer Inflation. Und: Der Markt handelt zuerst die Zeile, dann die Zusammensetzung. Rückläufe nach 15 Minuten sind normal, keine Manipulation.'},
+
+{n:'Core PCE — Preisindex der Konsumausgaben', cat:'Inflation', imp:4, src:'BEA', when:'Ende des Monats, 8:30 ET',
+ what:'Das offizielle Inflationsziel der Fed. Anderer Warenkorb als CPI, Gewichtung passt sich dem Konsumverhalten an, Gesundheitskosten stärker gewichtet.',
+ look:'Core MoM und die annualisierte 3-Monats-Rate. Letztere zeigt den Trend, bevor die Jahresrate ihn zeigt.',
+ react:'Meist gedämpft, weil CPI und PPI vorher veröffentlicht wurden und Analysten PCE daraus weitgehend errechnen können. Große Überraschungen sind selten — genau deshalb bewegen sie umso mehr.',
+ trap:'PCE als „wichtigste Zahl" zu überschätzen, weil die Fed sie nutzt. Für den Intraday-Impact ist der CPI klar wichtiger.'},
+
+{n:'PPI — Erzeugerpreise', cat:'Inflation', imp:3, src:'BLS', when:'meist am Tag vor oder nach dem CPI, 8:30 ET',
+ what:'Preise auf Produzentenebene, vorgelagert zum Konsumenten.',
+ look:'Die Teilkomponenten, die direkt in den PCE einfließen (Portfoliomanagement-Gebühren, Gesundheitsleistungen, Flugtickets). Analysten aktualisieren danach ihre PCE-Schätzung.',
+ react:'Für sich genommen moderat. Wichtig als Vorlauf: Ein starker PPI kann die CPI-Erwartung verschieben und einen Teil der Bewegung vorwegnehmen.',
+ trap:'Headline-PPI ist volatil durch Energie und Handelsspannen. Ohne Blick auf die PCE-relevanten Zeilen ist die Zahl fast nutzlos.'},
+
+{n:'Nonfarm Payrolls (Arbeitsmarktbericht)', cat:'Arbeitsmarkt', imp:5, src:'BLS', when:'in der Regel erster Freitag im Monat, 8:30 ET',
+ what:'Beschäftigungsaufbau außerhalb der Landwirtschaft, plus Arbeitslosenquote, Stundenlöhne, Partizipation und Wochenstunden.',
+ look:'Drei Zahlen gleichzeitig: (1) Payrolls inkl. <strong>Revisionen der beiden Vormonate</strong>, (2) Arbeitslosenquote auf eine Nachkommastelle, (3) Average Hourly Earnings MoM. Widersprechen sie sich, gewinnt bei Inflationsangst der Lohn, bei Rezessionsangst die Quote.',
+ react:'Der volatilste Release des Monats neben dem CPI. Erwarte eine Ausdehnung der Range in den ersten Minuten, häufig gefolgt von einem vollständigen Rücklauf, sobald die Details gelesen sind.',
+ trap:'Zwei Umfragen, ein Bericht: Die Payrolls kommen aus der Betriebsumfrage, die Arbeitslosenquote aus der Haushaltsumfrage. Sie können systematisch auseinanderlaufen. Große Abwärtsrevisionen entwerten eine starke Kopfzahl komplett.'},
+
+{n:'Initial Jobless Claims', cat:'Arbeitsmarkt', imp:3, src:'DOL', when:'jeden Donnerstag, 8:30 ET',
+ what:'Erstanträge auf Arbeitslosenhilfe. Der aktuellste Arbeitsmarktindikator überhaupt.',
+ look:'4-Wochen-Durchschnitt statt Einzelwoche, plus <strong>Continuing Claims</strong> (eine Woche älter). Steigende Continuing Claims bei stabilen Initial Claims heißt: Wer den Job verliert, findet schwerer einen neuen — ein frühes Abkühlungssignal.',
+ react:'Normalerweise klein. In Phasen, in denen der Markt auf eine Rezession achtet, wird der Donnerstag plötzlich zum Ereignis.',
+ trap:'Feiertage, Schulferien und Streiks verzerren einzelne Wochen stark. Niemals eine einzelne Woche interpretieren.'},
+
+{n:'JOLTS — offene Stellen', cat:'Arbeitsmarkt', imp:2, src:'BLS', when:'ca. 10:00 ET, mit rund zwei Monaten Verzögerung',
+ what:'Offene Stellen, Einstellungen, Kündigungen.',
+ look:'Die <strong>Quits Rate</strong>. Wer freiwillig kündigt, hat Vertrauen und Verhandlungsmacht — sie führt dem Lohnwachstum voraus. Außerdem das Verhältnis offener Stellen je Arbeitslosem.',
+ react:'Gering, weil die Daten alt sind. Wird nur in Regimen relevant, in denen der Markt einen überhitzten Arbeitsmarkt fürchtet.',
+ trap:'Niedrige Rücklaufquoten der Umfrage machen die Reihe unzuverlässig und revisionsanfällig.'},
+
+{n:'ISM Manufacturing', cat:'Konjunktur', imp:3, src:'ISM', when:'1. Werktag des Monats, 10:00 ET (16:00 dt.)',
+ what:'Diffusionsindex aus Einkaufsmanager-Umfragen der Industrie. 50 trennt Expansion von Kontraktion.',
+ look:'Nicht den Hauptindex, sondern <strong>New Orders</strong> (Vorlauf) und <strong>Prices Paid</strong> (Inflationsvorlauf). Neuaufträge minus Lager ist der klassische Frühindikator.',
+ react:'Mittel. Kommt um 16:00 deutscher Zeit — also mitten in der US-Eröffnungsphase und oft direkt in eine bereits laufende Bewegung hinein.',
+ trap:'Diffusionsindex heißt: gemessen wird die <em>Breite</em> der Veränderung, nicht ihre Größe. 51 bedeutet nicht 1 % Wachstum, sondern nur, dass etwas mehr Firmen Besserung melden als Verschlechterung.'},
+
+{n:'ISM Services', cat:'Konjunktur', imp:4, src:'ISM', when:'3. Werktag des Monats, 10:00 ET',
+ what:'Dasselbe für den Dienstleistungssektor — rund 70 % der US-Wirtschaft.',
+ look:'Business Activity, New Orders, Employment und Prices Paid. Für die aktuelle Inflationsdebatte ist Dienstleistungs-Prices-Paid oft aussagekräftiger als die Industrie.',
+ react:'Häufig stärker als der Industrie-ISM, weil der Sektor die Wirtschaft dominiert.',
+ trap:'Konkurrenz zum S&P-Global-PMI, der oft in eine andere Richtung zeigt. Bei Widerspruch gewinnt für den US-Markt in der Regel der ISM.'},
+
+{n:'Retail Sales', cat:'Konjunktur', imp:3, src:'Census Bureau', when:'ca. Mitte des Monats, 8:30 ET',
+ what:'Einzelhandelsumsätze, nominal und nicht inflationsbereinigt.',
+ look:'Die <strong>Control Group</strong> (ohne Autos, Benzin, Baumaterial, Gastronomie) — sie fließt direkt in die BIP-Berechnung ein.',
+ react:'Mittel bis hoch, wenn der Markt auf die Konsumstärke schaut.',
+ trap:'Nominal: Bei hoher Inflation sehen Umsätze stark aus, obwohl real weniger gekauft wird.'},
+
+{n:'BIP (Advance / 2nd / 3rd Estimate)', cat:'Konjunktur', imp:2, src:'BEA', when:'quartalsweise, 8:30 ET',
+ what:'Gesamtwirtschaftsleistung, in drei Schätzungen mit steigender Datenbasis.',
+ look:'Advance-Schätzung und darin <strong>Final Sales to Private Domestic Purchasers</strong> — der Kern der Binnennachfrage ohne Lagerhaltung und Außenhandel.',
+ react:'Meist gering, weil rückwärtsgerichtet und durch Monatsdaten bereits weitgehend bekannt.',
+ trap:'Lageraufbau und Nettoexporte können die Kopfzahl völlig verzerren, ohne dass die Nachfrage sich geändert hat.'},
+
+{n:'FOMC-Zinsentscheid', cat:'Zentralbank', imp:5, src:'Federal Reserve', when:'8× im Jahr, Statement 14:00 ET (20:00 dt.), Pressekonferenz 14:30 ET',
+ what:'Zinsentscheid, Begleiterklärung, viermal jährlich zusätzlich Projektionen (SEP) mit dem Dot Plot.',
+ look:'Erstens die <strong>Änderungen im Wortlaut</strong> gegenüber dem Vorstatement, zweitens abweichende Stimmen, drittens im SEP die Mediandots für dieses und nächstes Jahr. Die eigentliche Bewegung kommt oft erst in der Pressekonferenz.',
+ react:'Zwei getrennte Volatilitätsfenster. Klassisches Muster: eine Reaktion um 20:00 auf das Statement, dann eine gegenläufige um 20:30, wenn Powell den Ton relativiert.',
+ trap:'Den Entscheid selbst zu handeln. Der Zinsschritt ist fast immer eingepreist — gehandelt wird der <em>Pfad</em>, nicht der Schritt.'},
+
+{n:'FOMC-Protokoll (Minutes)', cat:'Zentralbank', imp:3, src:'Federal Reserve', when:'drei Wochen nach der Sitzung, 14:00 ET',
+ what:'Ausführliche Diskussion der Sitzung.',
+ look:'Formulierungen zur Mengenbeschreibung: „einige", „mehrere", „die meisten", „fast alle Teilnehmer". Sie kodieren, wie breit eine Position im Gremium getragen wird.',
+ react:'Punktuell heftig, weil um 20:00 deutscher Zeit alle Headlines gleichzeitig laufen und Algorithmen auf Schlüsselwörter reagieren.',
+ trap:'Die Minutes sind drei Wochen alt. Neuere Reden einzelner Mitglieder überschreiben ihre Aussage regelmäßig.'},
+
+{n:'Fed-Reden und Jackson Hole', cat:'Zentralbank', imp:3, src:'Fed-Bezirke', when:'laufend; Blackout in den 10 Tagen vor einer Sitzung',
+ what:'Einordnung der Datenlage durch stimmberechtigte und nicht stimmberechtigte Mitglieder.',
+ look:'Nur stimmberechtigte Mitglieder und der Vorsitzende zählen wirklich. Neuigkeitswert prüfen: Wiederholt jemand seine bekannte Position, ist es keine Nachricht.',
+ react:'Von null bis erheblich. Am größten, wenn ein bekannter Falke plötzlich taubenhaft klingt oder umgekehrt.',
+ trap:'Regionale Fed-Präsidenten ohne Stimmrecht bekommen in Medien dieselbe Schlagzeilengröße wie der Vorsitzende.'},
+
+{n:'Michigan Sentiment inkl. Inflationserwartungen', cat:'Umfragen', imp:3, src:'Univ. of Michigan', when:'vorläufig Mitte des Monats (Fr., 10:00 ET), final zum Monatsende',
+ what:'Verbrauchervertrauen plus 1-Jahres- und 5-Jahres-Inflationserwartung.',
+ look:'Die <strong>langfristige Inflationserwartung</strong>. Die Fed hat wiederholt betont, dass eine Entankerung dieser Erwartung ihr größter Sorgenpunkt wäre — ein Sprung dort bewegt Zinsmärkte spürbar.',
+ react:'Der Stimmungswert selbst ist Rauschen. Die Inflationserwartung kann eine echte Reaktion auslösen.',
+ trap:'Kleine Stichprobe, hohe Revisionen zwischen vorläufig und final.'},
+
+{n:'Consumer Confidence (Conference Board)', cat:'Umfragen', imp:2, src:'Conference Board', when:'letzter Dienstag im Monat, 10:00 ET',
+ what:'Vertrauensindex mit stärkerem Arbeitsmarktbezug als Michigan.',
+ look:'Das „Labor Differential": Anteil, der Jobs als reichlich verfügbar bezeichnet, minus Anteil, der sie als schwer zu bekommen bezeichnet. Guter Vorlauf zur Arbeitslosenquote.',
+ react:'Gering, außer in Rezessionsdebatten.',
+ trap:'Michigan misst eher Kaufkraftgefühl und Benzinpreise, Conference Board eher Jobsicherheit. Verschiedene Sachen, gleiche Überschrift.'},
+
+{n:'Treasury-Auktionen (10y / 30y)', cat:'Anleihen', imp:3, src:'US-Finanzministerium', when:'monatlich, meist 13:00 ET (19:00 dt.)',
+ what:'Platzierung neuer Staatsanleihen. Bewertet wird die Nachfrage.',
+ look:'„Tail" (Zuteilungsrendite über der erwarteten), Bid-to-Cover und der Anteil der Indirect Bidders (ausländische Nachfrage).',
+ react:'Eine schwache lange Auktion treibt Renditen hoch und belastet den NQ unmittelbar. Einer der wenigen planbaren Nachmittags-Katalysatoren.',
+ trap:'Wird von den meisten Kalendern nicht als High Impact geführt und deshalb übersehen.'},
+
+{n:'Quartalszahlen der Mega-Caps', cat:'Unternehmen', imp:4, src:'Unternehmen', when:'nach US-Schluss, Berichtssaison ab ca. 3 Wochen nach Quartalsende',
+ what:'Ergebnisse der größten Indexmitglieder. Im NQ dominieren wenige Namen die Gewichtung.',
+ look:'Ausblick und Investitionsbudgets, nicht das abgelaufene Quartal. Reaktion in der nachbörslichen Sitzung, die den Future über Nacht verschiebt.',
+ react:'Kann ein Gap erzeugen, das jeden Makro-Katalysator des Tages überlagert.',
+ trap:'Makro-Setup planen und übersehen, dass abends eine Mega-Cap berichtet. Immer prüfen.'},
+
+{n:'Verfall und Rollzyklus', cat:'Struktur', imp:3, src:'CME / OCC', when:'monatlich am 3. Freitag, quartalsweise Quad Witching (März, Juni, Sep, Dez)',
+ what:'Kein Makro, aber ein Terminplan, der Volumen und Positionierung verschiebt.',
+ look:'Rolltermine der Kontrakte (Front zu Back rund eine Woche vor Verfall) und große Verfallstermine, an denen Optionspositionen auslaufen.',
+ react:'Hohes Volumen, oft träge Kursbewegung vor dem Verfall, danach mehr Bewegungsfreiheit — passt zur Gamma-Betrachtung.',
+ trap:'Chartdaten über den Rollzeitpunkt hinweg ohne Anpassung vergleichen. Levels aus dem alten Kontrakt sind versetzt.'}
+];
+
+/* ============================================================
+   3) DATEN LESEN — Handwerk
+   ============================================================ */
+const LESEN = [
+{t:'Der Markt handelt die Überraschung, nicht die Zahl', b:`
+<p>Eine Inflation von 3 % ist weder gut noch schlecht. Entscheidend ist die Differenz zu dem, was vorher im Preis stand. Diese Differenz hat drei Ebenen:</p>
+<ul>
+<li><strong>Konsens</strong>: Median der Analystenschätzungen. Steht in jedem Kalender.</li>
+<li><strong>Whisper</strong>: Was Marktteilnehmer tatsächlich erwarten, oft abweichend vom Konsens, weil vorlaufende Daten schon etwas anderes andeuteten.</li>
+<li><strong>Positionierung</strong>: Wonach die Leute bereits positioniert sind. Bei einseitiger Positionierung reicht ein Treffer auf Konsens für eine heftige Bewegung, weil niemand mehr kaufen muss.</li>
+</ul>
+<div class="callout"><span class="lbl">Merksatz</span>Bewegung = Überraschung × Positionierung × Regime-Empfindlichkeit. Fehlt einer der drei Faktoren, passiert wenig — auch bei „großer" Nachricht.</div>
+<h3>Die Streuung der Schätzungen zählt</h3>
+<p>Liegen alle Analysten in einer engen Spanne, ist die Zahl gut prognostizierbar und eine Abweichung wiegt schwer. Ist die Spanne breit (typisch bei NFP), ist eine „Abweichung" vom Median oft nur statistisches Rauschen.</p>`},
+
+{t:'MoM, YoY und annualisiert — welche Rate wann', b:`
+<table>
+<tr><th>Form</th><th>Zeigt</th><th>Vorsicht</th></tr>
+<tr><td>MoM</td><td>aktuellste Dynamik</td><td>verrauscht, saisonanfällig</td></tr>
+<tr><td>YoY</td><td>Trend, medienwirksam</td><td>träge; fällt allein durch Basiseffekte</td></tr>
+<tr><td>3M annualisiert</td><td>Trendwechsel früh</td><td>reagiert stark auf einen Ausreißer</td></tr>
+<tr><td>6M annualisiert</td><td>der beste Kompromiss für Inflation</td><td>rund ein Quartal Verzögerung</td></tr>
+</table>
+<h3>Basiseffekt</h3>
+<p>Die Jahresrate fällt, wenn ein hoher Monat vor einem Jahr aus dem Fenster rollt — auch wenn die aktuelle Preisentwicklung unverändert ist. Wer nur YoY liest, feiert dann eine Disinflation, die es gar nicht gibt. Prüfe immer, welcher Vorjahresmonat gerade herausfällt.</p>
+<h3>Annualisieren</h3>
+<p><code>(1 + MoM)^12 − 1</code>. Faustregel: 0,2 % MoM entspricht rund 2,4 % im Jahr — also Zielerreichung. 0,4 % MoM sind knapp 5 % — also klar zu heiß. Damit kannst du jede CPI-Zahl in drei Sekunden gegen das Fed-Ziel prüfen.</p>`},
+
+{t:'Revisionen, Saisonbereinigung, Umfrageeffekte', b:`
+<ul>
+<li><strong>Revisionen</strong>: Payrolls werden zweimal revidiert, dazu kommt eine jährliche Benchmark-Anpassung. Eine starke Kopfzahl mit −80k Revision der Vormonate ist netto ein schwacher Bericht. Der Markt braucht dafür manchmal 10 Minuten — dort entstehen die Rückläufe.</li>
+<li><strong>Saisonbereinigung</strong>: Alle Hauptzahlen sind saisonbereinigt. Nach ungewöhnlichen Jahren (Pandemie, Streiks, Wetter) sind die Faktoren verzerrt. Der Januar ist notorisch schwierig, weil dann neue Faktoren und Preisanpassungen zusammenfallen.</li>
+<li><strong>Umfrage vs. Zählung</strong>: ISM, PMI, Michigan und Conference Board sind Stimmungen. Sie können sich von harten Daten lange lösen. Wenn weiche und harte Daten auseinanderlaufen, gewinnen historisch die harten.</li>
+</ul>
+<div class="callout warn"><span class="lbl">Regel</span>Ein Datenpunkt ist eine Beobachtung, kein Trend. Drei Datenpunkte in dieselbe Richtung sind ein Trend. Der Markt handelt trotzdem jeden einzelnen Punkt — das ist keine Ineffizienz, sondern Bayes'sches Aktualisieren unter Unsicherheit.</div>`},
+
+{t:'Die 60-Sekunden-Auswertung', b:`
+<p>Ablauf, den du bei jedem Release gleich durchziehst:</p>
+<table>
+<tr><th>Sek.</th><th>Schritt</th></tr>
+<tr><td>0–5</td><td>Kernzahl gegen Konsens. Höher, niedriger, im Rahmen?</td></tr>
+<tr><td>5–15</td><td>Zweitzahl prüfen (Revision, Lohn, Prices Paid). Bestätigt sie oder widerspricht sie?</td></tr>
+<tr><td>15–30</td><td>Reaktion im 2-Jahres-Yield und im Dollar. Ohne Zinsreaktion ist die Aktienbewegung Rauschen.</td></tr>
+<tr><td>30–60</td><td>Wo steht der Preis relativ zu deinen vorbereiteten Levels? Erst jetzt darf eine Handelsentscheidung entstehen.</td></tr>
+</table>
+<div class="callout win"><span class="lbl">Wichtiger als jede Interpretation</span>Deine Levels stehen <strong>vor</strong> dem Release fest. Die Nachricht sagt dir nur, ob ein Level hält oder bricht. Wer die Levels nach der Nachricht zeichnet, zeichnet die Nachricht nach.</div>`},
+
+{t:'Warum die erste Bewegung so oft lügt', b:`
+<p>In den ersten Sekunden handeln Maschinen die Kopfzahl gegen den Konsens. Dann treten diskretionäre Teilnehmer ein, die die Details lesen. Drittens kommen Positionsanpassungen und Hedges aus dem Optionsmarkt. Diese drei Wellen können verschiedene Richtungen haben.</p>
+<ul>
+<li><strong>Welle 1</strong> (0–60 s): reine Zahl vs. Konsens, extrem dünner Orderbuch, hohe Slippage.</li>
+<li><strong>Welle 2</strong> (1–15 min): Zusammensetzung, Revisionen, Zinsmarkt. Häufig Gegenbewegung.</li>
+<li><strong>Welle 3</strong> (ab 15–30 min): Der Markt entscheidet sich für eine Interpretation. Erst hier entsteht ein tragfähiger Trend.</li>
+</ul>
+<p>Genau deshalb passt eine Wartezeit nach dem Release zu deinem Ansatz: Die Eröffnungsspanne der ersten 30 Minuten enthält bereits alle drei Wellen und ist eine deutlich belastbarere Information als die erste Kerze.</p>`}
+];
+
+/* ============================================================
+   4) NEWS BEURTEILEN
+   ============================================================ */
+const NEWS = [
+{t:'Quellenhierarchie', b:`
+<table>
+<tr><th>Stufe</th><th>Quelle</th><th>Nutzung</th></tr>
+<tr><td>1</td><td>Primärquelle: bls.gov, bea.gov, federalreserve.gov, cftc.gov, treasury.gov</td><td>Wahrheit. Tabellen, Fußnoten, Revisionen. Für Nacharbeit, nicht für Echtzeit.</td></tr>
+<tr><td>2</td><td>Wire-Dienste (Reuters, Bloomberg, Dow Jones)</td><td>Echtzeit-Headlines. Was die Algorithmen lesen.</td></tr>
+<tr><td>3</td><td>Fachpresse mit Redaktion</td><td>Einordnung, nächster Tag.</td></tr>
+<tr><td>4</td><td>Social Media, Aggregatoren, Broker-Newsfeeds</td><td>Frühwarnung und Stimmungsbild. Niemals Handlungsgrundlage ohne Bestätigung.</td></tr>
+</table>
+<div class="callout warn"><span class="lbl">Falle</span>Ein Screenshot einer Schlagzeile ist keine Quelle. Bei Gerüchten mit Marktwirkung — Zinsschritt, Notfallmaßnahme, geopolitischer Vorfall — gilt: erst die Reaktion im Anleihe- und Devisenmarkt prüfen. Wenn dort nichts passiert, hat die Nachricht keine Substanz.</div>`},
+
+{t:'Der 3-Fragen-Filter für jede Schlagzeile', b:`
+<p>Bevor du auf irgendetwas reagierst:</p>
+<ol>
+<li><strong>Ist es neu?</strong> Sehr viele Meldungen sind Wiederholungen bekannter Sachverhalte in neuer Verpackung. Wenn dieselbe Information vor drei Tagen schon lief, ist sie im Preis.</li>
+<li><strong>Ist es zählbar?</strong> Lässt sich die Nachricht in eine Zahl übersetzen (Zinssatz, Gewinn, Menge)? „Spannungen nehmen zu" ist nicht zählbar und verpufft meist innerhalb einer Stunde. „Zoll von 25 % ab dem 1." ist zählbar.</li>
+<li><strong>Ändert es die Reaktionsfunktion der Fed?</strong> Wenn nein, ist der Effekt auf Indizes in der Regel kurzlebig.</li>
+</ol>
+<p>Bestehen alle drei Fragen den Test, hast du einen echten Katalysator. Bei zwei von drei: Volatilität ohne Trend. Bei einem: ignorieren.</p>`},
+
+{t:'Geopolitik, Zölle, Fiskalpolitik', b:`
+<ul>
+<li><strong>Geopolitische Schocks</strong> wirken über Energiepreise und Risikoprämie. Ohne anhaltenden Effekt auf Öl oder Kredit-Spreads verpuffen sie meist in ein bis drei Tagen. Historisch typisch: schnelle Abwärtsbewegung, Erholung binnen weniger Sitzungen.</li>
+<li><strong>Zölle und Handelspolitik</strong> sind gleichzeitig inflationär und wachstumsdämpfend — also der stagflationäre Quadrant. Deshalb reagieren Aktien darauf oft heftiger, als die reine Größenordnung vermuten lässt: Die Fed kann diesen Schock nicht bequem wegsenken.</li>
+<li><strong>Fiskalpolitik und Schuldenobergrenze</strong> wirken über das Anleiheangebot und die Liquidität. Der handelbare Teil ist meist nicht die politische Debatte, sondern die Emissionsplanung danach.</li>
+</ul>
+<div class="callout"><span class="lbl">Einordnung</span>Frage bei jeder politischen Nachricht: Verändert sie Angebot oder Nachfrage nach Geld, oder verändert sie nur Stimmung? Nur Ersteres hält.</div>`},
+
+{t:'Deine eigene Verzerrung im Newsflow', b:`
+<ul>
+<li><strong>Bestätigungssuche</strong>: Nach dem Einstieg suchst du Nachrichten, die deine Position stützen. Gegenmittel: Die Begründung für den Trade schriftlich <em>vor</em> dem Einstieg festhalten und danach keine neue Begründung mehr zulassen.</li>
+<li><strong>Neuigkeits-Reiz</strong>: Ein Nachrichtenstrom ist ein Automat für Handlungsimpulse. Wenn du ohne geplanten Katalysator im Feed hängst, suchst du nicht Information, sondern Erregung.</li>
+<li><strong>Narrativ-Nachträglichkeit</strong>: Der Kommentar am Abend erklärt jede Bewegung schlüssig. Diese Erklärung war um 15:00 nicht verfügbar und ist für die nächste Bewegung wertlos.</li>
+<li><strong>Autoritätsanker</strong>: Eine prominente Meinung ersetzt keine eigene Analyse und ist bereits im Preis, sobald du sie liest.</li>
+</ul>
+<div class="callout win"><span class="lbl">Praxis</span>Lege den Newsflow auf feste Fenster: einmal vor der Session (Kalender und Übernachtnachrichten), einmal danach (Auswertung). Während der Handelszeit nur geplante Ereignisse. Das schützt die Regeltreue mehr als jede zusätzliche Information sie verbessern könnte.</div>`}
+];
+
+/* ============================================================
+   5) COT
+   ============================================================ */
+const COT = [
+{t:'Was der COT-Report ist — und was nicht', b:`
+<p>Der <strong>Commitments of Traders</strong>-Report der US-Aufsichtsbehörde CFTC zeigt, wie sich die offenen Positionen an den Terminmärkten auf Händlergruppen verteilen. Erfasst werden nur Marktteilnehmer oberhalb einer je Kontrakt festgelegten Meldeschwelle.</p>
+<div class="wire">
+<div><span class="k">Stichtag</span><span class="v">Dienstag</span></div>
+<div><span class="k">Veröffentlichung</span><span class="v">Freitag</span></div>
+<div><span class="k">Verzögerung</span><span class="v">3 Tage</span></div>
+</div>
+<p>Erhoben wird zum Handelsschluss am Dienstag, veröffentlicht wird am Freitagnachmittag (15:30 ET). Bei US-Feiertagen verschiebt sich die Veröffentlichung.</p>
+<ul>
+<li><strong>Was es ist</strong>: ein Positionierungs-Röntgenbild mit drei Tagen Verzögerung. Ein Kontext-Werkzeug für Wochen- und Monatssicht.</li>
+<li><strong>Was es nicht ist</strong>: ein Timing-Signal. Es sagt nichts über Einstiege, nichts über den Intraday-Verlauf und nichts darüber, wann ein Extrem kippt.</li>
+</ul>
+<div class="callout warn"><span class="lbl">Grundsatz</span>Extreme Positionierung erhöht die Fallhöhe, sie bestimmt nicht den Zeitpunkt. Ein überfüllter Trade kann monatelang überfüllt bleiben und dabei weiterlaufen.</div>`},
+
+{t:'Die drei Reportformate', b:`
+<table>
+<tr><th>Report</th><th>Für welche Märkte</th><th>Kategorien</th></tr>
+<tr><td><strong>Legacy</strong></td><td>alle</td><td>Commercial, Non-Commercial (+ Spreading), Non-Reportable</td></tr>
+<tr><td><strong>Disaggregated</strong></td><td>Rohstoffe</td><td>Producer/Merchant, Swap Dealers, Managed Money, Other Reportables</td></tr>
+<tr><td><strong>TFF</strong> (Traders in Financial Futures)</td><td>Finanzterminkontrakte: Aktienindizes, Zinsen, Devisen</td><td>Dealer/Intermediary, Asset Manager/Institutional, Leveraged Funds, Other Reportables</td></tr>
+</table>
+<div class="callout"><span class="lbl">Für dich entscheidend</span>Für Aktienindex-Futures ist der <strong>TFF-Report</strong> das relevante Format, nicht der Legacy-Report. Die Legacy-Kategorien wurden für Rohstoffmärkte entworfen und übersetzen sich bei Finanzkontrakten schlecht.</div>`},
+
+{t:'Legacy: Non-Commercial vs. Commercial richtig verstehen', b:`
+<h3>Non-Commercial</h3>
+<p>Große Marktteilnehmer <em>ohne</em> zugrundeliegendes Absicherungsgeschäft — im Kern spekulative Fonds. Sie sind typischerweise <strong>trendfolgend</strong>: Ihre Netto-Position wächst, während ein Trend läuft, und erreicht ihr Maximum oft nahe der Wende. Deshalb gelten Non-Commercials als „falsch an den Extremen" — nicht weil sie schlecht wären, sondern weil ihr Stil sie dorthin führt.</p>
+<h3>Commercial</h3>
+<p>Teilnehmer mit Absicherungsbedarf im Basiswert. Sie sind <strong>preisunelastisch und antizyklisch</strong>: Sie verkaufen in steigende Märkte und kaufen in fallende, weil sie Bestände hedgen und nicht auf Richtung wetten.</p>
+<div class="callout warn"><span class="lbl">Der große Irrtum</span>„Commercials sind das Smart Money." Bei Rohstoffen steckt dahinter ein Produzent mit Marktkenntnis. Bei <strong>Aktienindex-Futures</strong> ist der „Commercial" überwiegend ein Händler der Sell-Side, der Kundenpositionen und Optionsbücher absichert. Seine Netto-Short-Position ist damit vor allem ein <em>Spiegelbild der Kundennachfrage</em> — kein Marktausblick. Wer die Netto-Short der Commercials im ES als Bärensignal liest, liest sein eigenes Bild verkehrt herum.</div>
+<h3>Non-Reportable</h3>
+<p>Alles unterhalb der Meldeschwelle, rechnerischer Rest. Wird gern als „dumb money" bezeichnet; für Indexfutures ist die Aussagekraft gering, weil dieser Anteil klein ist.</p>`},
+
+{t:'TFF: die vier Gruppen bei Index-Futures', b:`
+<table>
+<tr><th>Gruppe</th><th>Wer</th><th>Wie lesen</th></tr>
+<tr><td><strong>Dealer / Intermediary</strong></td><td>Sell-Side, Market Maker, Banken</td><td>Reaktiv. Ihre Position entsteht aus dem Kundengeschäft und aus Options-Hedging. Kein Richtungssignal — aber ein Hinweis darauf, was Kunden gerade wollten.</td></tr>
+<tr><td><strong>Asset Manager / Institutional</strong></td><td>Pensionskassen, Versicherer, Publikumsfonds</td><td>Strukturell und dauerhaft netto long, weil Futures Aktienquoten abbilden. Interessant ist nur die <em>Veränderung</em> und deren Position im historischen Band.</td></tr>
+<tr><td><strong>Leveraged Funds</strong></td><td>Hedgefonds, CTAs, systematische Trendfolger</td><td>Die spannendste Gruppe. Schnell, gehebelt, trendfolgend. Extreme hier sind die eigentlichen Squeeze-Kandidaten.</td></tr>
+<tr><td><strong>Other Reportables</strong></td><td>große Adressen ohne obige Zuordnung</td><td>Rest, meist wenig aussagekräftig.</td></tr>
+</table>
+<div class="callout win"><span class="lbl">Praktische Kurzfassung für NQ/ES</span>Sieh dir <strong>Leveraged Funds</strong> als Positionierungsindikator an, <strong>Asset Manager</strong> als langsamen Strukturfaktor und <strong>Dealer</strong> als Spiegel des Kundengeschäfts. Eine extreme Netto-Short der Leveraged Funds bei gleichzeitig steigendem Markt ist das klassische Squeeze-Setup: Diese Positionen müssen zurückgekauft werden.</div>`},
+
+{t:'Rechnen: Netto-Position, Veränderung, COT-Index', b:`
+<h3>Netto-Position</h3>
+<p><code>Netto = Long − Short</code> je Gruppe. Die Summe aller Netto-Positionen ist immer null: Jeder Kontrakt hat einen Käufer und einen Verkäufer. Deshalb ist die Aussage „alle sind long" strukturell unmöglich — jemand hält die Gegenseite.</p>
+<h3>Wochenveränderung</h3>
+<p>Oft aussagekräftiger als der Absolutwert. Eine Veränderung von +40.000 Kontrakten in einer Woche zeigt, dass eine Gruppe aktiv umgeschichtet hat.</p>
+<h3>COT-Index (nach Williams)</h3>
+<p>Normiert die Netto-Position auf ihr eigenes historisches Band:</p>
+<p><code>Index = (Netto_aktuell − Netto_min) / (Netto_max − Netto_min) × 100</code></p>
+<p>über ein Fenster von typischerweise 26, 52 oder 156 Wochen. Damit werden Märkte und Zeiträume vergleichbar.</p>
+<table>
+<tr><th>Wert</th><th>Bedeutung</th></tr>
+<tr><td>über 80</td><td>Gruppe ist historisch stark long positioniert</td></tr>
+<tr><td>20–80</td><td>neutral, kein Extremwert</td></tr>
+<tr><td>unter 20</td><td>historisch stark short positioniert</td></tr>
+</table>
+<p>Ein Extremwert ist eine Kontext-Information, kein Auftrag. Er verändert die Wahrscheinlichkeitsverteilung der Bewegungsgröße, nicht die Richtung des nächsten Tages.</p>`},
+
+{t:'Open Interest und Preis kombiniert', b:`
+<p>Das Open Interest zeigt die Zahl offener Kontrakte insgesamt. Zusammen mit dem Preis ergibt sich eine klassische Vier-Felder-Deutung:</p>
+<table>
+<tr><th>Preis</th><th>Open Interest</th><th>Deutung</th></tr>
+<tr><td>steigt</td><td>steigt</td><td>neues Geld auf der Long-Seite — Trend ist getragen</td></tr>
+<tr><td>steigt</td><td>fällt</td><td>Short-Eindeckungen — Rally auf Zeit, oft ohne Fortsetzung</td></tr>
+<tr><td>fällt</td><td>steigt</td><td>neue Shorts — Abwärtstrend ist getragen</td></tr>
+<tr><td>fällt</td><td>fällt</td><td>Long-Auflösung — Verkaufsdruck lässt nach</td></tr>
+</table>
+<div class="callout warn"><span class="lbl">Verzerrung</span>Rund um Rolltermine und Quartalsverfälle steigt und fällt das Open Interest aus rein technischen Gründen. In diesen Wochen ist die Deutung wertlos.</div>`},
+
+{t:'COT im Ablauf: eine Routine, die 10 Minuten dauert', b:`
+<ol>
+<li>Freitagabend oder Samstag: TFF-Daten für den betreffenden Index-Kontrakt abrufen (cftc.gov, Rubrik Commitments of Traders, Financial Futures).</li>
+<li>Netto-Position der <strong>Leveraged Funds</strong> und der <strong>Asset Manager</strong> eintragen — im Rechner-Tab dieser App.</li>
+<li>COT-Index über 52 Wochen ablesen. Über 80 oder unter 20 markieren.</li>
+<li>Wochenveränderung notieren. Ungewöhnlich groß? Dann ist etwas passiert, das du im Wochenchart wiederfinden solltest.</li>
+<li>Open Interest gegen den Preisverlauf der Woche prüfen.</li>
+<li>Ein Satz ins Wochenprotokoll: Positionierung X, Extrem ja/nein, erwartete Konsequenz für die Größe von Gegenbewegungen.</li>
+</ol>
+<div class="callout"><span class="lbl">Erwartungsmanagement</span>COT verbessert nicht deine Trefferquote im einzelnen Trade. Es verbessert deine Erwartung darüber, wie weit eine Bewegung tragen kann und wie gefährlich eine Gegenbewegung wird. Das ist Risikoinformation, keine Signalinformation.</div>`}
+];
+
+/* ============================================================
+   9) PLAYBOOK
+   ============================================================ */
+const PLAY = [
+{t:'Vorbereitung am Vorabend', b:`
+<ul>
+<li>Kalender für morgen: Welche Releases, welche Uhrzeit deutscher Zeit, welche Impact-Stufe?</li>
+<li>Bei High-Impact: Konsens notieren und beide Szenarien vorher zu Ende denken — nicht „was passiert wohl", sondern „was tue ich, wenn X".</li>
+<li>Berichtet heute Abend eine schwergewichtige Aktie?</li>
+<li>Positionierungs-Kontext aus dem letzten COT: Extrem oder neutral?</li>
+<li>Levels zeichnen. Danach den Newsfeed schließen.</li>
+</ul>`},
+
+{t:'Umgang mit dem Release-Fenster', b:`
+<table>
+<tr><th>Zeitfenster</th><th>Verhalten</th></tr>
+<tr><td>5 Minuten vor bis Release</td><td>Keine neuen Einstiege. Spreads weiten sich, Stops werden unzuverlässig.</td></tr>
+<tr><td>0–2 Minuten</td><td>Nur beobachten. Slippage ist hier am größten, das Orderbuch am dünnsten.</td></tr>
+<tr><td>2–30 Minuten</td><td>Die Spanne bildet sich. Reaktion der Zinsen prüfen. Zahlen im Detail lesen.</td></tr>
+<tr><td>nach 30 Minuten</td><td>Erst jetzt regulärer Setup-Aufbau. Der Ausbruch aus der Eröffnungsspanne bekommt an Datentagen zusätzliche Aussagekraft.</td></tr>
+</table>
+<div class="callout warn"><span class="lbl">Ausnahme, die keine ist</span>„Diesmal ist die Bewegung so klar, dass ich früher rein muss." Genau dieses Gefühl markiert das Fenster mit dem schlechtesten Verhältnis von Slippage zu Information.</div>`},
+
+{t:'Wie ein Datentag deine Level-Arbeit verändert', b:`
+<p>Übersetzung von Makro in deine bestehende Regime-Logik:</p>
+<ul>
+<li><strong>Ohne Katalysator</strong> ist die Wahrscheinlichkeit hoch, dass Preise in eine Spanne zurückkehren. Levels halten öfter.</li>
+<li><strong>Mit High-Impact-Release</strong> kommt neue Information in den Markt, die vorher nicht im Preis war. Das ist der Rohstoff für Ausbrüche. Ein Level, das an einem CPI-Tag bricht, bricht qualitativ anders als ein Level, das an einem leeren Dienstag bricht.</li>
+<li><strong>Am Verfallstag</strong> dominieren mechanische Kräfte. Nachrichten wirken gedämpft, bis die Positionen ausgelaufen sind.</li>
+</ul>
+<p>Konsequenz: Der Kalender gehört in die Regime-Einordnung <em>vor</em> die Session, nicht als nachträgliche Erklärung. Ein Datentag verschiebt die erwartete Tagesspanne — und damit dein realistisches Ziel und deinen sinnvollen Stop-Abstand.</p>`},
+
+{t:'Was du niemals aus Makro ableiten solltest', b:`
+<ul>
+<li><strong>Eine Richtungsprognose für den Tag.</strong> Du weißt nicht, was in der Zahl steht, und selbst mit der Zahl weißt du nicht, wie das aktuelle Regime sie bewertet.</li>
+<li><strong>Eine größere Position, weil die Analyse überzeugend ist.</strong> Die Qualität der These und die richtige Positionsgröße sind zwei getrennte Fragen.</li>
+<li><strong>Eine Rechtfertigung, den Stop zu erweitern.</strong> „Die Daten geben mir recht, der Markt braucht nur Zeit" ist die teuerste Verwendung von Makro-Wissen überhaupt.</li>
+<li><strong>Ein Ersatz für dein Regelwerk.</strong> Makro liefert Kontext. Der Einstieg kommt aus deinem Prozess — oder er kommt nicht.</li>
+</ul>
+<div class="callout win"><span class="lbl">Zielbild</span>Ein Trader mit Makro-Verständnis handelt nicht mehr Trades, sondern verstehbarere. Er weiß morgens, welcher Typ Tag wahrscheinlich ist, und passt Erwartung und Größe an — nicht die Richtung.</div>`}
+];
+
+/* ============================================================
+   6) REAKTIONS-TRAINER
+   ============================================================ */
+const TRAIN = [
+{ctx:'Regime: Inflationssorge dominiert, Fed-Rhetorik betont Preisstabilität.',
+ rel:'CPI Core MoM', prior:'0,3 %', cons:'0,3 %', act:'0,5 %',
+ q:'Welche Erstreaktion ist die wahrscheinlichste?',
+ o:['NQ steigt, weil Inflation gutes nominales Wachstum bedeutet','NQ fällt, 2y-Rendite steigt, Dollar fester','Keine Reaktion, weil die Jahresrate unverändert bleibt','Anleihen und Aktien steigen gemeinsam'],
+ a:1,
+ exp:'Klare Aufwärtsüberraschung im Kern in einem Inflations-Regime: Der Markt preist einen restriktiveren Fed-Pfad, kurze Renditen steigen, Duration wird abgestraft, der Dollar zieht an. Die Prüfung erfolgt über den 2y-Yield — ohne dessen Reaktion wäre die Aktienbewegung nicht belastbar.'},
+
+{ctx:'Regime: Der Markt fürchtet eine Rezession, Inflation liegt nahe Ziel.',
+ rel:'Nonfarm Payrolls', prior:'150k', cons:'160k', act:'275k, Löhne im Rahmen',
+ q:'Wie ist die starke Zahl in diesem Regime am ehesten zu lesen?',
+ o:['Negativ, weil die Fed nicht senken kann','Positiv, weil das Rezessionsszenario schwächer wird','Irrelevant, Payrolls sind zu verrauscht','Negativ, weil Löhne die Inflation treiben'],
+ a:1,
+ exp:'In einem Wachstums-Regime mit gezähmter Inflation gilt „good news is good news": Starke Beschäftigung bei ruhigen Löhnen stützt Gewinne, ohne die Fed zu provozieren. Dieselbe Zahl hätte 2022 das Gegenteil ausgelöst — die Reaktionsfunktion entscheidet, nicht die Zahl.'},
+
+{ctx:'Keine besondere Vorgeschichte.',
+ rel:'Nonfarm Payrolls', prior:'180k', cons:'170k', act:'190k, aber Vormonate um 90k nach unten revidiert',
+ q:'Wie bewertest du den Bericht netto?',
+ o:['Stark, die Kopfzahl schlägt den Konsens','Schwach: die Revisionen übersteigen die Überraschung deutlich','Neutral, Revisionen zählen nicht','Nicht bewertbar ohne die Arbeitslosenquote'],
+ a:1,
+ exp:'+20k Überraschung gegen −90k Revision ist ein netto klar schwächerer Bericht. Genau solche Konstellationen erzeugen den typischen Rücklauf: Die erste Bewegung folgt der Kopfzahl, die zweite den Revisionen.'},
+
+{ctx:'FOMC-Sitzung, ein Zinsschritt ist zu über 95 % eingepreist.',
+ rel:'Zinsentscheid', prior:'—', cons:'Schritt wie erwartet', act:'Schritt wie erwartet, Statement fast unverändert',
+ q:'Was bewegt den Markt an diesem Nachmittag am ehesten?',
+ o:['Der Zinsschritt selbst','Die Pressekonferenz und der Ausblick auf den weiteren Pfad','Das Handelsvolumen','Die Abstimmungsreihenfolge'],
+ a:1,
+ exp:'Ein eingepreister Schritt ist keine Information. Gehandelt wird der Pfad: Formulierungsänderungen, Dot Plot und vor allem der Ton in der Pressekonferenz. Deshalb entstehen an FOMC-Tagen zwei getrennte Volatilitätsfenster, die gegenläufig sein können.'},
+
+{ctx:'Zahlen kommen um 14:30 deutscher Zeit.',
+ rel:'CPI', prior:'—', cons:'—', act:'Kern minimal unter Konsens; NQ springt 120 Punkte, der 2y-Yield bewegt sich kaum',
+ q:'Wie ordnest du die Divergenz ein?',
+ o:['Der Zinsmarkt liegt falsch, Aktien führen','Die Aktienbewegung ist wenig fundiert und rückläufig gefährdet','Sofort long, der Ausbruch ist bestätigt','Die Zahl war für die Fed sehr wichtig'],
+ a:1,
+ exp:'Ohne Reaktion am kurzen Ende hat die Zahl den erwarteten Fed-Pfad nicht verändert. Eine große Aktienbewegung bei stillem Zinsmarkt ist meist Positionierung und Stop-Auslösung — solche Bewegungen laufen überdurchschnittlich oft zurück.'},
+
+{ctx:'TFF-Daten für den Index-Future.',
+ rel:'COT / Leveraged Funds', prior:'—', cons:'—', act:'Netto-Short auf 52-Wochen-Tief, COT-Index bei 4, Markt steigt seit drei Wochen',
+ q:'Welche Schlussfolgerung ist zulässig?',
+ o:['Sofort long, ein Squeeze ist sicher','Sofort short, die Profis sind short','Erhöhtes Squeeze-Risiko nach oben; Gegenbewegungen können ungewöhnlich heftig ausfallen','Keine Aussage möglich, COT ist nutzlos'],
+ a:2,
+ exp:'Extreme Positionierung verändert die Verteilung der Bewegungsgrößen, nicht den Zeitpunkt. Eine gehebelte Short-Position in einem steigenden Markt muss irgendwann zurückgekauft werden — daraus folgt erhöhte Aufwärtsdynamik als Risiko, kein Einstiegssignal.'},
+
+{ctx:'E-mini-Index-Future, Legacy-Report.',
+ rel:'COT / Commercials', prior:'—', cons:'—', act:'Commercials tief netto short, wie fast immer',
+ q:'Was bedeutet das?',
+ o:['Die klügsten Marktteilnehmer erwarten einen Absturz','Wenig: bei Index-Futures spiegeln Commercials überwiegend Hedging der Sell-Side','Der Markt ist manipuliert','Ein zuverlässiges Verkaufssignal'],
+ a:1,
+ exp:'Die Rohstoff-Intuition „Commercials sind Smart Money" trägt bei Finanzkontrakten nicht. Dort sind es überwiegend Händler, die Kundengeschäft und Optionsbücher absichern. Die strukturelle Netto-Short ist Bilanz, nicht Prognose. Nutze bei Index-Futures den TFF-Report.'},
+
+{ctx:'Nachmittags-Session ohne Makrodaten.',
+ rel:'10-jährige Treasury-Auktion, 19:00 dt.', prior:'—', cons:'—', act:'Schwache Nachfrage, deutlicher Tail, wenig Auslandsbeteiligung',
+ q:'Welche Kettenreaktion ist die naheliegendste?',
+ o:['Renditen fallen, NQ steigt','Renditen steigen, Duration leidet, NQ tendenziell schwächer','Nur der Dollar reagiert','Auktionen bewegen Aktien nie'],
+ a:1,
+ exp:'Schwache Nachfrage nach neuem Angebot heißt: niedrigerer Preis, höhere Rendite. Höhere Langfristrenditen belasten hochbewertete Wachstumswerte am stärksten. Das ist einer der wenigen planbaren Nachmittags-Katalysatoren und steht in vielen Kalendern nicht als High Impact.'},
+
+{ctx:'ISM Services erscheint um 16:00 deutscher Zeit.',
+ rel:'ISM Services', prior:'52,0', cons:'52,3', act:'52,4 — aber Prices Paid springt von 57 auf 64',
+ q:'Welche Zeile ist die eigentliche Nachricht?',
+ o:['Der Hauptindex, er liegt über Konsens','Prices Paid: ein deutlicher Inflationsimpuls im dominierenden Sektor','Der Beschäftigungsindex','Keine, die Abweichung ist zu klein'],
+ a:1,
+ exp:'Der Hauptindex traf den Konsens praktisch punktgenau — keine Information. Der Sprung bei den gezahlten Preisen im Dienstleistungssektor ist dagegen genau die Größe, die die Inflationsdebatte antreibt. Nebenzeilen schlagen die Kopfzahl regelmäßig.'},
+
+{ctx:'Schlagzeile im Broker-Feed, keine Bestätigung durch einen Wire-Dienst.',
+ rel:'Gerücht über Notfallmaßnahme der Notenbank', prior:'—', cons:'—', act:'Aktien springen, Anleihen und Devisen reagieren nicht',
+ q:'Wie gehst du vor?',
+ o:['Sofort in Richtung der Schlagzeile handeln','Nicht handeln: fehlende Bestätigung in Zins- und Devisenmarkt spricht gegen Substanz','Gegen die Schlagzeile handeln','Position verdoppeln, weil die Bewegung erst beginnt'],
+ a:1,
+ exp:'Eine Nachricht mit echter geldpolitischer Substanz bewegt zuerst und am stärksten das kurze Zinsende und den Dollar. Isolierte Aktienbewegungen ohne diese Bestätigung sind das typische Muster für unbestätigte Meldungen.'},
+
+{ctx:'Inflationsdaten, Vorjahresvergleich.',
+ rel:'CPI YoY', prior:'3,4 %', cons:'3,1 %', act:'3,1 % — MoM aber 0,4 %',
+ q:'Wie liest du das?',
+ o:['Klare Disinflation, die Jahresrate fällt','Vorsicht: der Rückgang stammt aus dem Basiseffekt, die aktuelle Dynamik bei 0,4 % MoM entspricht rund 5 % annualisiert','Nichts Neues','Der MoM-Wert ist irrelevant'],
+ a:1,
+ exp:'Die Jahresrate fällt, weil ein hoher Vorjahresmonat aus dem Fenster rollt. Die laufende Dynamik ist mit 0,4 % pro Monat weit über dem Ziel. Wer nur YoY liest, feiert eine Disinflation, die in den aktuellen Daten nicht steht.'},
+
+{ctx:'Wöchentliche Arbeitsmarktdaten.',
+ rel:'Jobless Claims', prior:'220k', cons:'222k', act:'218k, aber Continuing Claims auf Mehrjahreshoch',
+ q:'Welches Signal ist bedeutsamer?',
+ o:['Initial Claims, sie sind aktueller','Continuing Claims: Entlassungen bleiben niedrig, aber Wiedereinstellung wird schwerer','Beide sind gleich unwichtig','Das Signal ist eindeutig positiv'],
+ a:1,
+ exp:'Niedrige Erstanträge bei steigenden Fortzahlungen beschreiben einen Arbeitsmarkt, in dem kaum entlassen, aber auch kaum eingestellt wird. Das ist typischerweise die erste Phase einer Abkühlung — und deutlich informativer als eine einzelne Wochenzahl.'},
+
+{ctx:'Handelspolitische Ankündigung mit konkretem Satz und Datum.',
+ rel:'Zollpaket', prior:'—', cons:'—', act:'Zölle auf breite Importgruppen angekündigt',
+ q:'In welchen Makro-Quadranten fällt das?',
+ o:['Goldilocks','Überhitzung','Stagflationär: preistreibend und wachstumsdämpfend zugleich','Disinflationärer Abschwung'],
+ a:2,
+ exp:'Zölle heben Preise und dämpfen zugleich Handel und Investitionen. Für Aktien ist das der unangenehmste Quadrant, weil die Notenbank diesen Schock nicht durch Zinssenkungen glätten kann, ohne die Inflation zu befeuern.'},
+
+{ctx:'Freitag nach Veröffentlichung des COT.',
+ rel:'Open Interest & Preis', prior:'—', cons:'—', act:'Preis über die Woche +2 %, Open Interest deutlich gefallen',
+ q:'Was beschreibt das am besten?',
+ o:['Neues Long-Geld strömt in den Markt','Short-Eindeckungen treiben die Rally','Der Abwärtstrend ist getragen','Der Markt ist unentschieden'],
+ a:1,
+ exp:'Steigender Preis bei fallendem Open Interest bedeutet, dass Positionen geschlossen und nicht neu eröffnet werden — typisch für Eindeckungsrallys. Solche Bewegungen haben oft weniger Tragfähigkeit. Prüfe aber, ob gerade Rollwoche ist: dann ist die Deutung wertlos.'}
+];
+
+/* ============================================================
+   7) QUIZ
+   ============================================================ */
+const QUIZ = [
+{q:'Wann wird der COT-Report erhoben und wann veröffentlicht?', o:['Erhebung Freitag, Veröffentlichung Montag','Erhebung Dienstag, Veröffentlichung Freitag','Täglich in Echtzeit','Erhebung Montag, Veröffentlichung Mittwoch'], a:1, e:'Stichtag ist der Handelsschluss am Dienstag, veröffentlicht wird am Freitagnachmittag — drei Tage Verzögerung.'},
+{q:'Welcher Report ist für Aktienindex-Futures der passende?', o:['Legacy','Disaggregated','Traders in Financial Futures (TFF)','Bank Participation Report'], a:2, e:'TFF wurde für Finanzterminkontrakte entworfen und unterscheidet Dealer, Asset Manager, Leveraged Funds und Other Reportables.'},
+{q:'Wie berechnet sich die Netto-Position einer Gruppe?', o:['Long geteilt durch Short','Long minus Short','Long plus Short','Long minus Spreading'], a:1, e:'Netto = Long − Short. Die Summe aller Gruppen ergibt immer null.'},
+{q:'Warum sind Commercials bei Index-Futures fast dauerhaft netto short?', o:['Weil sie einen Crash erwarten','Weil sie überwiegend Kundengeschäft und Optionsbücher absichern','Weil sie den Markt manipulieren','Weil sie langfristig pessimistisch sind'], a:1, e:'Bei Finanzkontrakten steht hinter „Commercial" meist die Sell-Side, deren Position aus Hedging entsteht — Spiegelbild, keine Prognose.'},
+{q:'Welche TFF-Gruppe eignet sich am besten als Indikator für spekulative Positionierung?', o:['Dealer/Intermediary','Asset Manager','Leveraged Funds','Non-Reportable'], a:2, e:'Leveraged Funds sind schnell, gehebelt und trendfolgend — hier entstehen die Extreme mit Squeeze-Potenzial.'},
+{q:'Ein COT-Index von 92 bedeutet:', o:['92 % Trefferquote','Die Netto-Position liegt nahe dem oberen Rand ihres historischen Bandes','Der Markt steigt zu 92 % nächste Woche','92.000 Kontrakte netto'], a:1, e:'Der Index normiert die Netto-Position auf das Minimum und Maximum des gewählten Fensters.'},
+{q:'Welche Formel steckt hinter dem COT-Index?', o:['(Netto − Mittelwert) / Standardabweichung','(Netto − Min) / (Max − Min) × 100','Long / (Long + Short) × 100','Netto / Open Interest × 100'], a:1, e:'Es ist eine Min-Max-Normierung über ein rollierendes Fenster von z. B. 52 Wochen.'},
+{q:'Preis steigt, Open Interest fällt. Wahrscheinlichste Deutung?', o:['Neues Long-Geld','Short-Eindeckungen','Neue Shorts','Long-Auflösung im Abwärtstrend'], a:1, e:'Positionen werden geschlossen statt neu eröffnet — typisch für Eindeckungsrallys mit begrenzter Tragfähigkeit.'},
+{q:'Welchen Inflationsindex verwendet die Fed für ihr 2-%-Ziel?', o:['CPI','Core PCE','PPI','Import Price Index'], a:1, e:'Der Kern-PCE ist das offizielle Ziel. Der CPI bewegt Märkte trotzdem stärker, weil er früher erscheint.'},
+{q:'Welche Zahl im CPI-Bericht bewegt den Markt am stärksten?', o:['Headline YoY','Core MoM','Energiepreise','Nahrungsmittel MoM'], a:1, e:'Der Kern auf Monatsbasis zeigt die aktuelle Dynamik ohne die volatilen Komponenten.'},
+{q:'0,4 % CPI-Kern pro Monat entsprechen annualisiert ungefähr:', o:['2 %','3 %','5 %','8 %'], a:2, e:'(1,004)^12 − 1 ≈ 4,9 %. Deutlich über dem Ziel.'},
+{q:'Die Jahresrate der Inflation fällt, obwohl die Monatsrate hoch ist. Ursache?', o:['Rechenfehler der Behörde','Basiseffekt: ein hoher Vorjahresmonat rollt aus dem Fenster','Saisonbereinigung','Revision'], a:1, e:'Basiseffekte lassen die Jahresrate sinken, ohne dass sich die laufende Dynamik verbessert.'},
+{q:'Welche drei Zahlen liest du beim Arbeitsmarktbericht zuerst?', o:['Payrolls, Revisionen, Arbeitslosenquote und Löhne','Nur die Payrolls','Partizipation und Wochenstunden','Nur die Arbeitslosenquote'], a:0, e:'Kopfzahl plus Revisionen der Vormonate plus Quote und Stundenlöhne — erst zusammen ergibt sich das Bild.'},
+{q:'Warum können Payrolls und Arbeitslosenquote widersprüchlich sein?', o:['Zwei verschiedene Umfragen: Betriebe vs. Haushalte','Weil eine Zahl geschätzt ist','Weil sie aus verschiedenen Monaten stammen','Wegen der Inflation'], a:0, e:'Die Betriebsumfrage liefert die Beschäftigtenzahl, die Haushaltsumfrage die Quote. Sie können systematisch auseinanderlaufen.'},
+{q:'Was ist ein Diffusionsindex wie der ISM?', o:['Er misst das Wachstum in Prozent','Er misst die Breite der Veränderung, nicht deren Größe','Er misst Preise','Er misst die Produktionsmenge'], a:1, e:'50 trennt Expansion und Kontraktion; 55 sagt nichts über das Ausmaß des Wachstums.'},
+{q:'Welche ISM-Teilkomponente ist der wichtigste Frühindikator?', o:['Lagerbestände','New Orders','Lieferzeiten','Beschäftigung'], a:1, e:'Neuaufträge laufen der Aktivität voraus; Prices Paid liefert zusätzlich einen Inflationsvorlauf.'},
+{q:'Welche Größe in den Retail Sales fließt direkt ins BIP ein?', o:['Headline','Ohne Autos','Control Group','Benzinumsätze'], a:2, e:'Die Kontrollgruppe ohne Autos, Benzin, Baumaterial und Gastronomie.'},
+{q:'Was misst die Quits Rate in JOLTS?', o:['Entlassungen','Freiwillige Kündigungen','Offene Stellen','Neueinstellungen'], a:1, e:'Freiwillige Kündigungen zeigen Vertrauen und Verhandlungsmacht und laufen dem Lohnwachstum voraus.'},
+{q:'Wie liest man Jobless Claims korrekt?', o:['Einzelwoche gegen Konsens','4-Wochen-Durchschnitt und Continuing Claims mitlesen','Nur den Jahresvergleich','Gar nicht, zu verrauscht'], a:1, e:'Einzelne Wochen sind durch Feiertage und Streiks stark verzerrt.'},
+{q:'Was ist an einem FOMC-Tag der eigentliche Markttreiber?', o:['Der Zinsschritt','Der erwartete Zinspfad, Statement-Änderungen und die Pressekonferenz','Das Volumen','Die Uhrzeit'], a:1, e:'Der Schritt ist meist eingepreist — gehandelt wird der Pfad.'},
+{q:'Welche Rendite spiegelt Fed-Erwartungen am reinsten?', o:['30-jährige','10-jährige','2-jährige','3-monatige aus dem Vorjahr'], a:2, e:'Das kurze Ende reagiert am direktesten auf den erwarteten Leitzinspfad.'},
+{q:'Was zeigt der Dot Plot?', o:['Die Abstimmung über den aktuellen Schritt','Die individuellen Zinsprojektionen der FOMC-Teilnehmer','Die Inflationsprognose der Märkte','Die Bilanzentwicklung'], a:1, e:'Er erscheint viermal jährlich mit den Projektionen (SEP).'},
+{q:'Was bedeutet „good news is bad news"?', o:['Medien berichten negativ','Starke Konjunkturdaten belasten Aktien, weil sie restriktivere Geldpolitik bedeuten','Gute Nachrichten sind immer eingepreist','Ein Chartmuster'], a:1, e:'Typisch für Inflations-Regime. In Wachstums-Regimen dreht sich die Reaktionsfunktion um.'},
+{q:'Woran erkennst du das aktuelle Regime am schnellsten?', o:['An der Aktien-Anleihen-Korrelation nach Datenveröffentlichungen','Am Handelsvolumen','An der Zahl der Nachrichten','Am Wochentag'], a:0, e:'Fallen Aktien und Anleihen gemeinsam auf starke Daten, dominiert Inflation. Steigen Aktien trotz höherer Renditen, dominiert Wachstum.'},
+{q:'Warum reagiert der NQ meist stärker als der Dow auf Zinsdaten?', o:['Weniger Liquidität','Höhere Duration der Bewertung und Dominanz von Wachstumswerten','Andere Handelszeiten','Größerer Tick'], a:1, e:'Weit in der Zukunft liegende Gewinne reagieren empfindlicher auf den Diskontsatz.'},
+{q:'Eine schwache 30-jährige Treasury-Auktion führt tendenziell zu:', o:['Fallenden Renditen und steigenden Aktien','Steigenden Renditen und Druck auf zinssensitive Aktien','Keiner Reaktion','Steigendem Dollar und steigenden Aktien'], a:1, e:'Schwache Nachfrage nach neuem Angebot bedeutet niedrigere Preise und höhere Renditen.'},
+{q:'Was ist der TGA und warum ist er relevant?', o:['Ein Handelssystem','Das Konto des US-Finanzministeriums bei der Fed; sein Stand verschiebt Liquidität','Ein Inflationsindex','Ein COT-Kürzel'], a:1, e:'Ein steigender TGA entzieht dem System Liquidität, ein fallender führt sie zu.'},
+{q:'Welches Verhältnis beschreibt die Marktbewegung am besten?', o:['Bewegung = Zahl × Volumen','Bewegung = Überraschung × Positionierung × Regime-Empfindlichkeit','Bewegung = Nachrichtenmenge','Bewegung = Volatilität × Zeit'], a:1, e:'Fehlt einer der Faktoren, bleibt die Reaktion klein — auch bei prominenter Nachricht.'},
+{q:'Was ist die „Whisper Number"?', o:['Ein Insider-Tipp','Die tatsächliche Markterwartung, die vom veröffentlichten Konsens abweichen kann','Der Median der Analysten','Die revidierte Zahl'], a:1, e:'Sie erklärt, warum Kurse manchmal gegen die Richtung der Konsensabweichung laufen.'},
+{q:'Warum ist die Streuung der Analystenschätzungen wichtig?', o:['Sie bestimmt den Spread','Bei enger Streuung wiegt eine Abweichung schwerer als bei breiter','Sie zeigt das Volumen','Sie ist irrelevant'], a:1, e:'Bei breit gestreuten Schätzungen ist eine Abweichung vom Median oft nur Rauschen.'},
+{q:'Welcher der drei Filter gehört zum Schnelltest für Schlagzeilen?', o:['Ist es aufregend?','Ist es neu, ist es zählbar, ändert es die Fed-Reaktionsfunktion?','Wer hat es geschrieben?','Wie viele Likes hat es?'], a:1, e:'Nur wenn alle drei zutreffen, liegt ein echter Katalysator vor.'},
+{q:'Ein Aktiensprung ohne Reaktion im Zins- und Devisenmarkt deutet auf:', o:['Einen besonders starken Trend','Eine wenig fundierte, rücklaufgefährdete Bewegung','Eine Änderung der Geldpolitik','Ein Datenleck'], a:1, e:'Fehlende Bestätigung im Zinsmarkt ist ein starkes Warnsignal für Positionierungs-Rauschen.'},
+{q:'Zölle fallen makroökonomisch in welchen Quadranten?', o:['Goldilocks','Stagflationär','Disinflationärer Aufschwung','Neutral'], a:1, e:'Preistreibend und wachstumsdämpfend zugleich — die Notenbank kann diesen Schock nicht bequem abfedern.'},
+{q:'Warum ist der Januar bei Saisonbereinigung problematisch?', o:['Weniger Handelstage','Neue Saisonfaktoren und Jahresanfangs-Preisanpassungen fallen zusammen','Feiertage in Asien','Die Behörden arbeiten langsamer'], a:1, e:'Deshalb sind Januar-Werte besonders revisionsanfällig und schwer zu interpretieren.'},
+{q:'Wie viele Wellen hat eine typische Release-Reaktion?', o:['Eine','Zwei','Drei: Kopfzahl, Details/Zinsmarkt, Interpretation','Fünf'], a:2, e:'Erst nach der dritten Welle entsteht ein tragfähiger Trend — deshalb die Wartezeit nach dem Release.'},
+{q:'Wie geht man mit dem Zeitfenster unmittelbar vor High-Impact-Daten um?', o:['Position aufbauen, um vorne zu sein','Keine neuen Einstiege: Spreads weiten sich, Stops werden unzuverlässig','Größer handeln, weil Volatilität kommt','Stop entfernen'], a:1, e:'In diesem Fenster ist das Verhältnis von Slippage zu Information am schlechtesten.'},
+{q:'Wozu dient Makro-Wissen im Handel primär?', o:['Zur Richtungsprognose','Zur Einschätzung, ob Levels eher halten oder brechen, und zur erwarteten Tagesspanne','Zur Rechtfertigung größerer Positionen','Zur Erweiterung von Stops'], a:1, e:'Makro liefert Kontext für Erwartung und Risiko — der Einstieg kommt aus dem Regelwerk.'},
+{q:'Warum entwertet eine große Abwärtsrevision eine starke Payroll-Kopfzahl?', o:['Weil sie älter ist','Weil die Netto-Beschäftigungsentwicklung schlechter ausfällt als die Überraschung positiv war','Weil Revisionen nicht veröffentlicht werden','Sie entwertet sie nicht'], a:1, e:'+20k Überraschung gegen −90k Revision ergibt netto einen schwächeren Bericht.'},
+{q:'Welche Michigan-Komponente hat den größten Marktimpact?', o:['Der Stimmungsindex','Die langfristige Inflationserwartung','Die Einschätzung der Lage','Die Stichprobengröße'], a:1, e:'Die Fed betrachtet eine Entankerung der Inflationserwartungen als besonders gefährlich.'},
+{q:'Wofür ist der PPI vor allem nützlich?', o:['Als eigenständiger Markttreiber','Als Vorlauf, weil einzelne Zeilen direkt in die PCE-Schätzung einfließen','Zur Prognose der Arbeitslosigkeit','Für Rohstoffhandel'], a:1, e:'Analysten aktualisieren nach dem PPI ihre PCE-Prognose.'},
+{q:'Was passiert mit Chart-Levels über einen Rolltermin hinweg?', o:['Nichts','Sie sind versetzt, weil der neue Kontrakt anders notiert','Sie werden automatisch angepasst','Sie verdoppeln sich'], a:1, e:'Ohne Anpassung vergleichst du Preise verschiedener Kontrakte.'},
+{q:'Was ist beim COT die belastbarste Aussage?', o:['Es liefert Einstiegssignale','Es verändert die Erwartung an Bewegungsgröße und Squeeze-Risiko','Es prognostiziert die nächste Woche','Es ersetzt die Chartanalyse'], a:1, e:'Positionierung ist Risikoinformation, kein Timing.'}
+];
+
+/* ============================================================
+   RENDERING
+   ============================================================ */
+const TABS=[
+ ['motor','Makro-Motor'],['indi','Indikatoren'],['lesen','Daten lesen'],['news','News prüfen'],
+ ['cot','COT'],['rechner','COT-Daten'],['trainer','Trainer'],['quiz','Quiz'],['routine','Routine'],['playbook','Playbook']
+];
+const tabrow=$('#tabrow');
+TABS.forEach(([id,label],i)=>{
+  const b=document.createElement('button');
+  b.className='tab'; b.textContent=label; b.setAttribute('role','tab');
+  b.setAttribute('aria-selected', i===0?'true':'false'); b.dataset.id=id;
+  b.onclick=()=>go(id);
+  tabrow.appendChild(b);
+});
+function go(id){
+  TABS.forEach(([t])=>{
+    $('#v-'+t).classList.toggle('on', t===id);
+    tabrow.querySelector('[data-id="'+t+'"]').setAttribute('aria-selected', t===id?'true':'false');
+  });
+  window.scrollTo({top:0,behavior:'instant'});
+  if(id==='rechner') drawChart();
+}
+
+/* --- Modul-Renderer (aufklappbar, mit Gelesen-Markierung) --- */
+function modules(list, key, host, head){
+  let h = head || '';
+  list.forEach((m,i)=>{
+    const id=key+i, done=!!S.read[id];
+    h+=`<details class="mod" data-id="${id}">
+      <summary><span class="idx">${String(i+1).padStart(2,'0')}</span><span>${m.t}</span>
+      <span class="done-dot">${done?'gelesen':''}</span></summary>
+      <div class="body">${m.b}
+      <p style="margin-top:10px"><button class="act ghost" data-mark="${id}">${done?'Markierung entfernen':'Als gelesen markieren'}</button></p>
+      </div></details>`;
+  });
+  host.innerHTML=h;
+  host.querySelectorAll('[data-mark]').forEach(b=>{
+    b.onclick=()=>{
+      const id=b.dataset.mark;
+      S.read[id]=!S.read[id]; save();
+      b.textContent = S.read[id]?'Markierung entfernen':'Als gelesen markieren';
+      host.querySelector('details[data-id="'+id+'"] .done-dot').textContent = S.read[id]?'gelesen':'';
+    };
+  });
+}
+
+modules(MOTOR,'motor',$('#v-motor'),
+ `<h2 class="sec">Makro-Motor</h2><p class="sec-note">Die Mechanik dahinter: warum eine Zahl aus Washington den Nasdaq-Future bewegt.</p>`);
+modules(LESEN,'lesen',$('#v-lesen'),
+ `<h2 class="sec">Daten lesen</h2><p class="sec-note">Handwerk: Überraschung, Raten, Revisionen, und die 60-Sekunden-Auswertung.</p>`);
+modules(NEWS,'news',$('#v-news'),
+ `<h2 class="sec">News prüfen</h2><p class="sec-note">Quellen einordnen, Schlagzeilen filtern, eigene Verzerrungen erkennen.</p>`);
+modules(COT,'cot',$('#v-cot'),
+ `<h2 class="sec">COT verstehen</h2><p class="sec-note">Aufbau des Reports, Kategorien, und was Positionierung wirklich aussagt.</p>`);
+modules(PLAY,'play',$('#v-playbook'),
+ `<h2 class="sec">Playbook</h2><p class="sec-note">Vom Wissen zur Session: Vorbereitung, Release-Fenster, Grenzen.</p>`);
+
+/* --- Indikatoren --- */
+const CATS=[...new Set(IND.map(i=>i.cat))];
+let indFilter='alle', indQuery='';
+function renderInd(){
+  const host=$('#v-indi');
+  let h=`<h2 class="sec">Indikatoren</h2><p class="sec-note">Für jeden Release: die Zeile, auf die es ankommt — und die typische Falle.</p>
+  <div class="search"><input type="text" id="indSearch" placeholder="Suchen: CPI, ISM, Auktion …" value="${esc(indQuery)}"></div>
+  <div class="filterrow"><button class="chip" data-c="alle" aria-pressed="${indFilter==='alle'}">Alle</button>`;
+  CATS.forEach(c=>h+=`<button class="chip" data-c="${c}" aria-pressed="${indFilter===c}">${c}</button>`);
+  h+='</div>';
+  const q=indQuery.toLowerCase();
+  const rows=IND.filter(i=>(indFilter==='alle'||i.cat===indFilter) &&
+      (!q || (i.n+i.what+i.look+i.cat).toLowerCase().includes(q)));
+  if(!rows.length) h+='<div class="card">Kein Treffer. Suchbegriff ändern oder Filter auf „Alle" stellen.</div>';
+  rows.forEach(i=>{
+    let dots=''; for(let k=1;k<=5;k++) dots+=`<i class="${k<=i.imp?'on':''}"></i>`;
+    h+=`<div class="card">
+      <div class="eyebrow">${i.cat} · ${i.src}</div>
+      <h3 style="margin:0 0 2px">${i.n}<span class="impact" title="Impact ${i.imp}/5">${dots}</span></h3>
+      <div class="wire" style="grid-template-columns:1fr">
+        <div><span class="k">Termin</span><span class="v" style="font-size:12.5px">${i.when}</span></div>
+      </div>
+      <p><strong>Was gemessen wird.</strong> ${i.what}</p>
+      <p><strong>Worauf du schaust.</strong> ${i.look}</p>
+      <p><strong>Typische Reaktion.</strong> ${i.react}</p>
+      <p style="margin-bottom:2px"><strong>Falle.</strong> ${i.trap}</p>
+    </div>`;
+  });
+  host.innerHTML=h;
+  host.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{indFilter=c.dataset.c; renderInd();});
+  const inp=host.querySelector('#indSearch');
+  inp.oninput=e=>{indQuery=e.target.value; renderInd(); const n=$('#v-indi #indSearch'); n.focus(); n.setSelectionRange(n.value.length,n.value.length);};
+}
+renderInd();
+
+/* --- Trainer --- */
+let tIdx=0, tAnswered=false;
+function renderTrain(){
+  const c=TRAIN[tIdx], host=$('#v-trainer');
+  const acc = S.train.total? Math.round(S.train.right/S.train.total*100):0;
+  let h=`<h2 class="sec">Reaktions-Trainer</h2><p class="sec-note">Szenario lesen, Reaktion einschätzen, Auflösung vergleichen.</p>
+  <div class="scorebar"><span>Karte ${tIdx+1} / ${TRAIN.length}</span><span>Trefferquote ${acc}% (${S.train.right}/${S.train.total})</span></div>
+  <div class="prog"><i style="width:${(tIdx)/TRAIN.length*100}%"></i></div>
+  <div class="card">
+    <div class="eyebrow">Kontext</div><p>${c.ctx}</p>
+    <div class="wire"><div><span class="k">Vormonat</span><span class="v">${c.prior}</span></div>
+    <div><span class="k">Konsens</span><span class="v">${c.cons}</span></div>
+    <div><span class="k">Tatsächlich</span><span class="v">${c.act}</span></div></div>
+    <div class="eyebrow" style="margin-top:10px">${c.rel}</div>
+    <p style="font-weight:600">${c.q}</p>
+    <div id="tOpts"></div>
+    <div id="tExp"></div>
+  </div>`;
+  host.innerHTML=h;
+  const box=host.querySelector('#tOpts');
+  c.o.forEach((o,i)=>{
+    const b=document.createElement('button'); b.className='opt'; b.textContent=o;
+    b.onclick=()=>{
+      if(tAnswered) return; tAnswered=true;
+      S.train.total++; if(i===c.a) S.train.right++; save();
+      [...box.children].forEach((el,j)=>{el.disabled=true; if(j===c.a) el.classList.add('right'); else if(j===i) el.classList.add('wrong');});
+      host.querySelector('#tExp').innerHTML=
+        `<div class="callout ${i===c.a?'win':'warn'}"><span class="lbl">${i===c.a?'Richtig':'Auflösung'}</span>${c.exp}</div>
+         <button class="act" id="tNext">${tIdx<TRAIN.length-1?'Nächste Karte':'Von vorn beginnen'}</button>`;
+      host.querySelector('#tNext').onclick=()=>{tIdx=(tIdx+1)%TRAIN.length; tAnswered=false; renderTrain();};
+    };
+    box.appendChild(b);
+  });
+}
+renderTrain();
+
+/* --- Quiz --- */
+let qIdx=0, qScore=0, qAnswered=false, qOrder=[];
+function shuffle(a){a=[...a]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a;}
+function startQuiz(){ qOrder=shuffle(QUIZ.map((_,i)=>i)).slice(0,20); qIdx=0; qScore=0; qAnswered=false; renderQuiz(); }
+function renderQuiz(){
+  const host=$('#v-quiz');
+  if(qIdx>=qOrder.length){
+    const pct=Math.round(qScore/qOrder.length*100);
+    S.quiz.runs++; if(pct>S.quiz.best) S.quiz.best=pct; save();
+    host.innerHTML=`<h2 class="sec">Quiz</h2>
+      <div class="card"><div class="eyebrow">Durchgang beendet</div>
+      <h3 style="margin-top:0">${qScore} von ${qOrder.length} richtig — ${pct} %</h3>
+      <p>Bestwert ${S.quiz.best} % · ${S.quiz.runs} Durchgänge.</p>
+      <p>${pct>=85?'Sitzt. Nimm dir den Trainer vor, dort geht es um Anwendung statt Definitionen.':pct>=60?'Solide Basis. Die Fehlbereiche findest du am schnellsten in „Daten lesen" und „COT".':'Geh die Module noch einmal durch — vor allem Makro-Motor und COT.'}</p>
+      <button class="act" id="qAgain">Neuer Durchgang</button></div>`;
+    host.querySelector('#qAgain').onclick=startQuiz; return;
+  }
+  const q=QUIZ[qOrder[qIdx]];
+  host.innerHTML=`<h2 class="sec">Quiz</h2><p class="sec-note">20 zufällige Fragen aus ${QUIZ.length}. Bestwert ${S.quiz.best} %.</p>
+    <div class="scorebar"><span>Frage ${qIdx+1} / ${qOrder.length}</span><span>${qScore} richtig</span></div>
+    <div class="prog"><i style="width:${qIdx/qOrder.length*100}%"></i></div>
+    <div class="card"><p style="font-weight:600; font-size:15.5px">${q.q}</p><div id="qOpts"></div><div id="qExp"></div></div>`;
+  const box=host.querySelector('#qOpts');
+  q.o.forEach((o,i)=>{
+    const b=document.createElement('button'); b.className='opt'; b.textContent=o;
+    b.onclick=()=>{
+      if(qAnswered) return; qAnswered=true;
+      if(i===q.a) qScore++;
+      [...box.children].forEach((el,j)=>{el.disabled=true; if(j===q.a) el.classList.add('right'); else if(j===i) el.classList.add('wrong');});
+      host.querySelector('#qExp').innerHTML=`<div class="callout ${i===q.a?'win':'warn'}"><span class="lbl">${i===q.a?'Richtig':'Falsch'}</span>${q.e}</div>
+        <button class="act" id="qNext">Weiter</button>`;
+      host.querySelector('#qNext').onclick=()=>{qIdx++; qAnswered=false; renderQuiz();};
+    };
+    box.appendChild(b);
+  });
+}
+startQuiz();
+
+/* ============================================================
+   8) COT-DATEN — NQ & ES, direkt von der CFTC
+   ============================================================ */
+
+/* --- Märkte (CFTC Contract Market Codes) --- */
+const MKT=[
+  {k:'NQ', n:'NQ · E-mini Nasdaq-100', code:'209742'},
+  {k:'ES', n:'ES · E-mini S&P 500',    code:'13874A'}
+];
+const MKTN = k => (MKT.find(m=>m.k===k)||{n:k}).n;
+
+/* --- Gruppen: legacy = Non-Comm/Comm, tff = Dealer/AM/LevFunds/Other --- */
+const GRPDEF=[
+  {g:'Leveraged Funds',     src:'tff',    lb:'lev_money_positions_long',  sb:'lev_money_positions_short'},
+  {g:'Asset Manager',       src:'tff',    lb:'asset_mgr_positions_long',  sb:'asset_mgr_positions_short'},
+  {g:'Dealer/Intermediary', src:'tff',    lb:'dealer_positions_long',     sb:'dealer_positions_short'},
+  {g:'Other Reportables',   src:'tff',    lb:'other_rept_positions_long', sb:'other_rept_positions_short'},
+  {g:'Non-Commercial',      src:'legacy', lb:'noncomm_positions_long',    sb:'noncomm_positions_short'},
+  {g:'Commercial',          src:'legacy', lb:'comm_positions_long',       sb:'comm_positions_short'}
+];
+const GRP = GRPDEF.map(x=>x.g);
+const SODA={legacy:'6dca-aqww', tff:'gpe5-46if'};
+
+/* --- Migration: alte Zeilen ohne Markt bekommen NQ --- */
+let _mig=false;
+S.cot.rows.forEach(r=>{ if(!r.m){ r.m='NQ'; _mig=true; } });
+if(_mig) save();
+
+let calcMkt = localStorage.getItem('cot_mkt') || MKT[0].k;
+let calcGrp = localStorage.getItem('cot_grp') || GRP[0];
+let calcWin = +(localStorage.getItem('cot_win') || 52);
+if(!GRP.includes(calcGrp)) calcGrp = GRP[0];
+
+/* --- Feldnamen der CFTC-API sind uneinheitlich (_all / ohne Suffix).
+       Deshalb tolerant auflösen statt hart verdrahten. --- */
+function pickNum(row, base){
+  let v = row[base+'_all'];
+  if(v===undefined) v = row[base];
+  if(v===undefined){
+    const k = Object.keys(row).find(k=>k.startsWith(base) && !/_(old|other|1|2)$/.test(k));
+    if(k) v = row[k];
+  }
+  if(v===undefined || v===null || v==='') return null;
+  const n = +String(v).replace(/,/g,'');
+  return Number.isFinite(n) ? n : null;
+}
+
+function series(m,g){
+  return S.cot.rows.filter(r=>r.g===g && r.m===m).sort((a,b)=>a.d.localeCompare(b.d))
+    .map(r=>({...r, net:r.l-r.s}));
+}
+function cotIndex(arr, win){
+  if(arr.length<2) return null;
+  const w=arr.slice(-win); const nets=w.map(x=>x.net);
+  const mn=Math.min(...nets), mx=Math.max(...nets);
+  if(mx===mn) return null;
+  return Math.round((nets[nets.length-1]-mn)/(mx-mn)*100);
+}
+const fmt=n=>Number(n).toLocaleString('de-DE');
+const sig=n=>(n>0?'+':'')+fmt(n);
+
+/* ============================================================
+   CFTC-Import (Socrata / Public Reporting Environment)
+   ============================================================ */
+async function fetchCFTC(src, code, weeks){
+  const url='https://publicreporting.cftc.gov/resource/'+SODA[src]+'.json'
+    +'?$where='+encodeURIComponent("cftc_contract_market_code='"+code+"'")
+    +'&$order='+encodeURIComponent('report_date_as_yyyy_mm_dd DESC')
+    +'&$limit='+weeks;
+  const r=await fetch(url,{headers:{'Accept':'application/json'}});
+  if(!r.ok) throw new Error('HTTP '+r.status+' ('+src+')');
+  const j=await r.json();
+  if(!Array.isArray(j)) throw new Error('Unerwartetes Format ('+src+')');
+  return j;
+}
+
+async function importCFTC(weeks, log){
+  let added=0, updated=0, skipped=0;
+  const idx=new Map(S.cot.rows.map(r=>[r.m+'|'+r.g+'|'+r.d, r]));
+  for(const m of MKT){
+    for(const src of ['legacy','tff']){
+      log(m.k+' · '+(src==='tff'?'TFF (Dealer/AM/Lev Funds)':'Legacy (Non-Comm/Comm)')+' wird geladen …');
+      const raws=await fetchCFTC(src, m.code, weeks);
+      if(!raws.length){ log('⚠︎ '+m.k+' · '+src+': keine Zeilen zurückgeliefert.'); continue; }
+      const groups=GRPDEF.filter(x=>x.src===src);
+      for(const raw of raws){
+        const d=String(raw.report_date_as_yyyy_mm_dd||'').slice(0,10);
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){ skipped++; continue; }
+        const oi=pickNum(raw,'open_interest');
+        for(const gd of groups){
+          const l=pickNum(raw,gd.lb), s=pickNum(raw,gd.sb);
+          if(l===null||s===null){ skipped++; continue; }
+          const key=m.k+'|'+gd.g+'|'+d, ex=idx.get(key);
+          if(ex){
+            if(ex.l!==l||ex.s!==s||ex.oi!==oi){ ex.l=l; ex.s=s; ex.oi=oi; ex.src='cftc'; updated++; }
+          }else{
+            const row={id:key, m:m.k, g:gd.g, d, l, s, oi, src:'cftc'};
+            S.cot.rows.push(row); idx.set(key,row); added++;
+          }
+        }
+      }
+      log('✓ '+m.k+' · '+src+': '+raws.length+' Stichtage verarbeitet.');
+    }
+  }
+  save();
+  return {added, updated, skipped};
+}
+
+/* ============================================================
+   Render
+   ============================================================ */
+function renderCalc(){
+  const host=$('#v-rechner');
+  const arr=series(calcMkt,calcGrp);
+  const last=arr[arr.length-1], prev=arr[arr.length-2];
+  const idxW=cotIndex(arr,calcWin);
+  let verdict='—', vcls='';
+  if(idxW!==null){
+    if(idxW>=80){verdict='Historisch stark long positioniert'; vcls='bull';}
+    else if(idxW<=20){verdict='Historisch stark short positioniert'; vcls='bear';}
+    else {verdict='Neutrale Zone'; vcls='navy';}
+  }
+  const pctOI = last && last.oi ? (last.net/last.oi*100) : null;
+
+  /* Snapshot: alle Gruppen des gewählten Marktes am jeweils letzten Stichtag */
+  const snap = GRP.map(g=>{
+    const a=series(calcMkt,g);
+    if(!a.length) return null;
+    const L=a[a.length-1], P=a[a.length-2];
+    return {g, d:L.d, net:L.net, delta:P?L.net-P.net:null, idx:cotIndex(a,calcWin), n:a.length};
+  }).filter(Boolean);
+
+  const nRows=S.cot.rows.filter(r=>r.m===calcMkt).length;
+  const nNQ=S.cot.rows.filter(r=>r.m==='NQ').length;
+  const nES=S.cot.rows.filter(r=>r.m==='ES').length;
+
+  let h=`<h2 class="sec">COT-Daten</h2><p class="sec-note">Historie für NQ und ES direkt von der CFTC laden, Netto-Position und COT-Index berechnen. Alles bleibt lokal auf dem Gerät.</p>
+
+  <div class="card">
+    <div class="eyebrow">Historie von der CFTC laden</div>
+    <p style="font-size:13.5px; margin-bottom:10px">Holt Legacy (Non-Commercial / Commercial) und TFF (Dealer, Asset Manager, Leveraged Funds, Other) für <strong>NQ</strong> (Code 209742) und <strong>ES</strong> (Code 13874A). Vorhandene Stichtage werden aktualisiert, nicht doppelt angelegt.</p>
+    <div class="grid2" style="margin-bottom:10px">
+      <div><label class="fl">Zeitraum</label><select id="ldW">
+        <option value="52">1 Jahr · 52 Wochen</option>
+        <option value="156" selected>3 Jahre · 156 Wochen</option>
+        <option value="260">5 Jahre · 260 Wochen</option>
+        <option value="520">10 Jahre · 520 Wochen</option>
+      </select></div>
+      <div style="display:flex; align-items:flex-end"><button class="act" id="ldGo" style="width:100%">Laden</button></div>
+    </div>
+    <p id="ldOut" style="font-family:var(--mono); font-size:11.5px; color:var(--muted); margin:0; white-space:pre-line"></p>
+    <p style="font-size:12px; color:var(--muted); margin:10px 0 0">Bestand: NQ ${fmt(nNQ)} · ES ${fmt(nES)} Datensätze. Stichtag ist jeweils Dienstag, Veröffentlichung Freitag.</p>
+  </div>
+
+  <div class="card">
+    <div class="eyebrow">Auswertung</div>
+    <div class="grid3" style="margin-bottom:12px">
+      <div><label class="fl">Markt</label><select id="vM">${MKT.map(m=>`<option value="${m.k}" ${m.k===calcMkt?'selected':''}>${esc(m.n)}</option>`).join('')}</select></div>
+      <div><label class="fl">Gruppe</label><select id="vG">${GRP.map(g=>`<option ${g===calcGrp?'selected':''}>${esc(g)}</option>`).join('')}</select></div>
+      <div><label class="fl">Fenster (Wochen)</label><select id="vW">${[26,52,156].map(w=>`<option ${w===calcWin?'selected':''}>${w}</option>`).join('')}</select></div>
+    </div>
+    <div class="wire">
+      <div><span class="k">Netto</span><span class="v">${last?fmt(last.net):'—'}</span></div>
+      <div><span class="k">Δ Vorwoche</span><span class="v">${last&&prev?sig(last.net-prev.net):'—'}</span></div>
+      <div><span class="k">COT-Index ${calcWin}W</span><span class="v">${idxW!==null?idxW:'—'}</span></div>
+    </div>
+    <p style="margin:6px 0 0"><span class="pill ${vcls}">${verdict}</span>
+    ${last?` <span class="pill">Stichtag ${last.d}</span>`:''}
+    ${pctOI!==null?` <span class="pill">${pctOI>0?'+':''}${pctOI.toFixed(1).replace('.',',')} % vom OI</span>`:''}
+    ${arr.length<8?' <span class="pill amber">wenig Datenpunkte</span>':''}</p>
+    ${arr.length>=2?`<canvas id="cotChart" width="760" height="220" style="margin-top:14px"></canvas>
+      <p style="font-size:12px;color:var(--muted);margin:4px 0 10px">Netto-Position ${esc(calcGrp)} · ${esc(MKTN(calcMkt))}. Nulllinie gestrichelt.</p>
+      <canvas id="idxChart" width="760" height="150"></canvas>
+      <p style="font-size:12px;color:var(--muted);margin:4px 0 0">COT-Index (${calcWin} Wochen rollierend). Linien bei 20 und 80.</p>`:''}
+  </div>
+
+  ${snap.length?`<div class="card">
+    <div class="eyebrow">Snapshot ${esc(MKTN(calcMkt))}</div>
+    <table><tr><th>Gruppe</th><th>Stichtag</th><th class="num">Netto</th><th class="num">Δ Woche</th><th class="num">Index</th></tr>
+    ${snap.map(s=>`<tr><td>${esc(s.g)}</td><td style="font-family:var(--mono);font-size:12px">${s.d}</td>
+      <td class="num">${fmt(s.net)}</td><td class="num">${s.delta!==null?sig(s.delta):'—'}</td>
+      <td class="num">${s.idx!==null?`<span class="pill ${s.idx>=80?'bull':s.idx<=20?'bear':''}" style="font-size:10px">${s.idx}</span>`:'—'}</td></tr>`).join('')}
+    </table>
+  </div>`:''}
+
+  <div class="card">
+    <div class="eyebrow">Wochenwert manuell erfassen</div>
+    <div class="grid3" style="margin-bottom:10px">
+      <div><label class="fl">Markt</label><select id="cM">${MKT.map(m=>`<option value="${m.k}" ${m.k===calcMkt?'selected':''}>${m.k}</option>`).join('')}</select></div>
+      <div><label class="fl">Stichtag (Di)</label><input type="text" id="cD" placeholder="JJJJ-MM-TT"></div>
+      <div><label class="fl">Gruppe</label><select id="cG">${GRP.map(g=>`<option ${g===calcGrp?'selected':''}>${esc(g)}</option>`).join('')}</select></div>
+    </div>
+    <div class="grid2" style="margin-bottom:12px">
+      <div><label class="fl">Long-Kontrakte</label><input type="number" id="cL" inputmode="numeric"></div>
+      <div><label class="fl">Short-Kontrakte</label><input type="number" id="cS" inputmode="numeric"></div>
+    </div>
+    <button class="act" id="cAdd">Wert speichern</button>
+  </div>
+
+  <div class="card">
+    <div class="eyebrow">Schnellrechner ohne Historie</div>
+    <div class="grid3" style="margin-bottom:10px">
+      <div><label class="fl">Netto aktuell</label><input type="number" id="qN" inputmode="numeric"></div>
+      <div><label class="fl">Min im Fenster</label><input type="number" id="qMin" inputmode="numeric"></div>
+      <div><label class="fl">Max im Fenster</label><input type="number" id="qMax" inputmode="numeric"></div>
+    </div>
+    <button class="act ghost" id="qCalc">COT-Index berechnen</button>
+    <p id="qOut" style="font-family:var(--mono); margin-top:10px"></p>
+  </div>
+
+  <div class="card">
+    <div class="eyebrow">Monatsrate annualisieren</div>
+    <div class="grid2" style="margin-bottom:10px">
+      <div><label class="fl">MoM in Prozent</label><input type="number" step="0.01" id="aM" inputmode="decimal" placeholder="0,30"></div>
+      <div style="display:flex; align-items:flex-end"><button class="act ghost" id="aCalc" style="width:100%">Umrechnen</button></div>
+    </div>
+    <p id="aOut" style="font-family:var(--mono); margin:0"></p>
+  </div>
+
+  <h3>Erfasste Werte — ${esc(MKTN(calcMkt))} · ${esc(calcGrp)}</h3>
+  ${arr.length? `<table><tr><th>Stichtag</th><th class="num">Long</th><th class="num">Short</th><th class="num">Netto</th><th class="num">Δ</th><th></th></tr>
+    ${arr.slice().reverse().slice(0,60).map((r,i,a)=>{
+      const nx=a[i+1];
+      return `<tr><td style="font-family:var(--mono);font-size:12.5px">${r.d}</td><td class="num">${fmt(r.l)}</td><td class="num">${fmt(r.s)}</td><td class="num">${fmt(r.net)}</td>
+      <td class="num">${nx?sig(r.net-nx.net):'—'}</td>
+      <td class="num"><button class="chip" data-del="${esc(r.id)}">×</button></td></tr>`;}).join('')}</table>
+    ${arr.length>60?`<p style="font-size:12px;color:var(--muted);margin-top:-6px">… ${fmt(arr.length-60)} ältere Stichtage vorhanden (im Chart enthalten).</p>`:''}
+    <button class="act ghost" id="expCsv">CSV exportieren</button>
+    <button class="act ghost" id="delMkt" style="margin-left:6px">${calcMkt} löschen</button>`
+   : '<div class="card tight">Noch keine Werte für diese Kombination. Nutze oben „Historie von der CFTC laden“.</div>'}
+  `;
+  host.innerHTML=h;
+
+  const sel=id=>host.querySelector(id);
+
+  sel('#ldGo').onclick=async ()=>{
+    const btn=sel('#ldGo'), out=sel('#ldOut'), weeks=+sel('#ldW').value;
+    const lines=[]; const log=t=>{lines.push(t); out.textContent=lines.join('\n');};
+    btn.disabled=true; btn.textContent='Lädt …';
+    try{
+      const res=await importCFTC(weeks, log);
+      log('');
+      log('Fertig: '+res.added+' neu, '+res.updated+' aktualisiert.');
+      setTimeout(()=>{renderCalc(); const o=$('#v-rechner').querySelector('#ldOut'); if(o) o.textContent=lines.join('\n');}, 400);
+    }catch(e){
+      log('');
+      log('✕ Abruf fehlgeschlagen: '+e.message);
+      log('Mögliche Gründe: keine Verbindung, CFTC-Wartung, oder Blockade durch Browser/Netzwerk.');
+      log('Alternative: Werte manuell unten erfassen (tradingster.com oder cftc.gov).');
+      btn.disabled=false; btn.textContent='Erneut versuchen';
+    }
+  };
+
+  sel('#vM').onchange=e=>{calcMkt=e.target.value; localStorage.setItem('cot_mkt',calcMkt); renderCalc();};
+  sel('#vG').onchange=e=>{calcGrp=e.target.value; localStorage.setItem('cot_grp',calcGrp); renderCalc();};
+  sel('#vW').onchange=e=>{calcWin=+e.target.value; localStorage.setItem('cot_win',calcWin); renderCalc();};
+
+  sel('#cAdd').onclick=()=>{
+    const m=sel('#cM').value, d=sel('#cD').value.trim(), g=sel('#cG').value;
+    const l=+sel('#cL').value, s=+sel('#cS').value;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){alert('Stichtag im Format JJJJ-MM-TT eintragen.'); return;}
+    if(!Number.isFinite(l)||!Number.isFinite(s)||(!l&&!s)){alert('Long und Short als Zahl eintragen.'); return;}
+    const key=m+'|'+g+'|'+d;
+    const ex=S.cot.rows.find(r=>r.m===m&&r.g===g&&r.d===d);
+    if(ex){ex.l=l; ex.s=s; ex.src='manuell';} else {S.cot.rows.push({id:key, m, g, d, l, s, src:'manuell'});}
+    calcMkt=m; calcGrp=g;
+    localStorage.setItem('cot_mkt',m); localStorage.setItem('cot_grp',g);
+    save(); renderCalc();
+  };
+
+  host.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
+    S.cot.rows=S.cot.rows.filter(r=>String(r.id)!==b.dataset.del); save(); renderCalc();
+  });
+
+  if(sel('#delMkt')) sel('#delMkt').onclick=()=>{
+    if(confirm('Alle erfassten COT-Werte für '+calcMkt+' löschen?')){
+      S.cot.rows=S.cot.rows.filter(r=>r.m!==calcMkt); save(); renderCalc();
+    }
+  };
+
+  if(sel('#expCsv')) sel('#expCsv').onclick=()=>{
+    const head='Markt;Gruppe;Stichtag;Long;Short;Netto;OpenInterest';
+    const body=S.cot.rows.slice().sort((a,b)=>(a.m+a.g+a.d).localeCompare(b.m+b.g+b.d))
+      .map(r=>[r.m,r.g,r.d,r.l,r.s,r.l-r.s,r.oi??''].join(';')).join('\n');
+    const blob=new Blob([head+'\n'+body],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob); a.download='cot-historie.csv'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  };
+
+  sel('#qCalc').onclick=()=>{
+    const n=+sel('#qN').value, mn=+sel('#qMin').value, mx=+sel('#qMax').value;
+    const out=sel('#qOut');
+    if(mx===mn){out.textContent='Min und Max dürfen nicht gleich sein.'; return;}
+    const v=Math.round((n-mn)/(mx-mn)*100);
+    out.textContent=`COT-Index = ${v} — ${v>=80?'oberes Extrem':v<=20?'unteres Extrem':'neutrale Zone'}`;
+  };
+  sel('#aCalc').onclick=()=>{
+    const m=parseFloat(String(sel('#aM').value).replace(',','.'));
+    const out=sel('#aOut');
+    if(!Number.isFinite(m)){out.textContent='Monatsrate eintragen, z. B. 0,3'; return;}
+    const a=(Math.pow(1+m/100,12)-1)*100;
+    out.textContent=`${m.toFixed(2).replace('.',',')} % pro Monat = ${a.toFixed(1).replace('.',',')} % annualisiert  ·  Fed-Ziel liegt bei 2 %`;
+  };
+  drawChart();
+}
+
+/* ============================================================
+   Charts
+   ============================================================ */
+function drawChart(){
+  const arrAll=series(calcMkt,calcGrp);
+  const arr=arrAll.slice(-Math.max(calcWin,8));
+  const cv=document.getElementById('cotChart');
+  if(cv && arr.length>=2){
+    const ctx=cv.getContext&&cv.getContext('2d');
+    if(ctx){
+      const W=cv.width, H=cv.height, pad=46;
+      ctx.clearRect(0,0,W,H);
+      const nets=arr.map(a=>a.net);
+      let mn=Math.min(...nets,0), mx=Math.max(...nets,0);
+      const span=(mx-mn)||1; mn-=span*.1; mx+=span*.1;
+      const x=i=>pad+ i*(W-pad-8)/(arr.length-1);
+      const y=v=>H-20-((v-mn)/(mx-mn))*(H-38);
+      ctx.setLineDash([4,4]); ctx.strokeStyle='#C9C0AE'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(pad,y(0)); ctx.lineTo(W-8,y(0)); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle='#1F3A5F'; ctx.lineWidth=2; ctx.beginPath();
+      arr.forEach((a,i)=>{ i?ctx.lineTo(x(i),y(a.net)):ctx.moveTo(x(i),y(a.net)); }); ctx.stroke();
+      const lastNet=arr[arr.length-1].net;
+      ctx.fillStyle= lastNet>=0 ? '#2E6B4F' : '#A33B32';
+      ctx.beginPath(); ctx.arc(x(arr.length-1), y(lastNet), 4, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle='#6E675C'; ctx.font='11px JetBrains Mono, monospace';
+      ctx.fillText(fmt(Math.round(mx)), 2, 14);
+      ctx.fillText(fmt(Math.round(mn)), 2, H-6);
+      ctx.fillText(arr[0].d, pad, H-4);
+      ctx.fillText(arr[arr.length-1].d, W-78, H-4);
+    }
+  }
+
+  const cv2=document.getElementById('idxChart');
+  if(cv2 && arrAll.length>=4){
+    const ctx=cv2.getContext&&cv2.getContext('2d');
+    if(ctx){
+      const W=cv2.width, H=cv2.height, pad=46, top=12, bot=18;
+      ctx.clearRect(0,0,W,H);
+      /* rollierender Index über die letzten min(calcWin, len) Punkte */
+      const pts=[];
+      for(let i=0;i<arrAll.length;i++){
+        const w=arrAll.slice(Math.max(0,i-calcWin+1), i+1);
+        if(w.length<4){ pts.push(null); continue; }
+        const nets=w.map(z=>z.net), mn=Math.min(...nets), mx=Math.max(...nets);
+        pts.push(mx===mn?null:Math.round((nets[nets.length-1]-mn)/(mx-mn)*100));
+      }
+      const show=pts.slice(-Math.max(calcWin,8));
+      const x=i=>pad+ i*(W-pad-8)/Math.max(1,(show.length-1));
+      const y=v=>H-bot-(v/100)*(H-top-bot);
+      [20,80].forEach(lvl=>{
+        ctx.setLineDash([3,4]); ctx.strokeStyle= lvl===80?'#2E6B4F':'#A33B32'; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(pad,y(lvl)); ctx.lineTo(W-8,y(lvl)); ctx.stroke(); ctx.setLineDash([]);
+      });
+      ctx.strokeStyle='#B5852B'; ctx.lineWidth=2; ctx.beginPath();
+      let started=false;
+      show.forEach((v,i)=>{
+        if(v===null){ started=false; return; }
+        if(!started){ ctx.moveTo(x(i),y(v)); started=true; } else ctx.lineTo(x(i),y(v));
+      });
+      ctx.stroke();
+      const lastIdx=[...show].reverse().find(v=>v!==null);
+      if(lastIdx!==undefined){
+        ctx.fillStyle= lastIdx>=80?'#2E6B4F':lastIdx<=20?'#A33B32':'#B5852B';
+        ctx.beginPath(); ctx.arc(x(show.length-1), y(lastIdx), 4, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.fillStyle='#6E675C'; ctx.font='11px JetBrains Mono, monospace';
+      ctx.fillText('100', 2, y(100)+4);
+      ctx.fillText('0', 2, y(0)+4);
+    }
+  }
+}
+renderCalc();
+
+
+/* ============================================================
+   ROUTINE — Taktung und Checklisten
+   ============================================================ */
+const ROUTINE=[
+{id:'tag', t:'Täglich vor der Session', time:'5 Minuten', when:'vor der US-Eröffnung, bevor du Charts öffnest',
+ intro:'Ziel ist nicht Analyse, sondern Einordnung des Tagestyps. Danach ist der Newsfeed zu.',
+ items:[
+  'Kalender für heute: welche Releases, welche Uhrzeit deutscher Zeit, Impact-Stufe?',
+  'Höchste Stufe heute markieren — das ist dein Volatilitätsfenster, keine neuen Einstiege 5 Minuten davor.',
+  'Übernacht-Nachrichten: gab es etwas Zählbares? 3-Fragen-Filter anwenden, sonst ignorieren.',
+  'Kurzer Blick auf 2-Jahres-Rendite und Dollar: hat sich über Nacht die Fed-Erwartung verschoben?',
+  'Berichtet heute Abend eine schwergewichtige Aktie aus dem Index?',
+  'Tagestyp festlegen: Datentag / leerer Tag / Verfalls- oder Rollwoche.',
+  'Daraus ableiten: erwartete Tagesspanne, realistisches Ziel, sinnvoller Stop-Abstand.',
+  'Levels zeichnen. Newsfeed schließen.'
+ ]},
+{id:'woche', t:'Wöchentlich', time:'20 Minuten', when:'Freitagabend nach COT-Veröffentlichung oder Sonntag/Montag früh',
+ intro:'Hier kommt die Positionierung rein. Der COT-Report erscheint nur einmal pro Woche — öfter prüfen bringt keine neue Information.',
+ items:[
+  'Im Tab COT-Daten auf „Laden“ tippen — NQ und ES werden direkt von der CFTC aktualisiert.',
+  'COT-Index über 52 Wochen ablesen. Über 80 oder unter 20? Dann Extrem notieren.',
+  'Wochenveränderung prüfen: ungewöhnlich groß? Im Wochenchart nachsehen, was passiert ist.',
+  'Open Interest gegen den Preisverlauf der Woche stellen (Vier-Felder-Deutung).',
+  'Regime nachschärfen: Wie haben Aktien und Anleihen auf die Releases dieser Woche reagiert? Good news gut oder schlecht?',
+  'Kommende Woche durchgehen: High-Impact-Tage markieren, mit Schichtplan abgleichen — welche Tage handelst du überhaupt?',
+  'Eine Wochenthese in einem Satz aufschreiben — und dazu, was sie widerlegen würde.'
+ ]},
+{id:'monat', t:'Monatlich und quartalsweise', time:'30 Minuten', when:'zum Monatswechsel',
+ intro:'Die langsame Ebene: Trends, Termine, und die ehrliche Auswertung.',
+ items:[
+  'Inflationstrend aktualisieren: Kernrate über 3 und 6 Monate annualisiert — steigt oder fällt die Dynamik?',
+  'Arbeitsmarkt-Trend: Payrolls im Dreimonatsschnitt nach Revisionen, Continuing Claims.',
+  'FOMC-Termine der nächsten Monate eintragen, Sitzungen mit Projektionen (SEP) markieren.',
+  'Rolltermin und Quartalsverfall im Kalender vormerken.',
+  'Auswertung: Wie war deine Regeltreue an Datentagen gegenüber ruhigen Tagen? Ergebnis getrennt betrachten.',
+  'Eine Frage beantworten: Hat Makro-Kontext meine Entscheidungen tatsächlich verbessert, oder liefert er nur Erklärungen im Nachhinein?'
+ ]}
+];
+
+function renderRoutine(){
+  const host=$('#v-routine');
+  S.routine = S.routine || {};
+  let h=`<h2 class="sec">Routine</h2><p class="sec-note">Was täglich, was wöchentlich, was monatlich gehört. Haken bleiben gespeichert, bis du die Liste zurücksetzt.</p>
+
+  <div class="card">
+    <div class="eyebrow">Taktung auf einen Blick</div>
+    <table style="margin-bottom:0">
+      <tr><th>Ebene</th><th>Wie oft</th><th>Warum</th></tr>
+      <tr><td>Kalender &amp; News</td><td>täglich, 5 Min</td><td>Ein Datentag verändert Tagesspanne und Stop-Abstand sofort.</td></tr>
+      <tr><td>COT / Positionierung</td><td>wöchentlich</td><td>Der Report erscheint nur freitags. Öfter prüfen liefert nichts Neues.</td></tr>
+      <tr><td>Regime</td><td>wöchentlich</td><td>Die Reaktionsfunktion dreht über Wochen, nicht über Nacht.</td></tr>
+      <tr><td>Trends &amp; Auswertung</td><td>monatlich</td><td>Drei Datenpunkte machen einen Trend, ein Monat macht eine Statistik.</td></tr>
+    </table>
+  </div>`;
+
+  ROUTINE.forEach(r=>{
+    const st=S.routine[r.id]||{done:[],ts:null};
+    const cnt=st.done.length, all=r.items.length;
+    h+=`<div class="card" data-blk="${r.id}">
+      <div class="eyebrow">${r.time} · ${r.when}</div>
+      <h3 style="margin:0 0 4px">${r.t}</h3>
+      <p style="font-size:13.5px; color:var(--muted)">${r.intro}</p>
+      <div class="prog"><i style="width:${cnt/all*100}%"></i></div>
+      <div class="chk">`;
+    r.items.forEach((it,i)=>{
+      const on=st.done.includes(i);
+      h+=`<button class="opt" data-r="${r.id}" data-i="${i}" style="display:flex; gap:10px; align-items:flex-start; ${on?'opacity:.55':''}">
+        <span style="font-family:var(--mono); color:${on?'var(--bull)':'var(--muted)'}">${on?'✓':'○'}</span>
+        <span style="${on?'text-decoration:line-through':''}">${it}</span></button>`;
+    });
+    h+=`</div>
+      <div style="display:flex; gap:8px; align-items:center; margin-top:4px">
+        <button class="act ghost" data-reset="${r.id}">Liste zurücksetzen</button>
+        <span style="font-family:var(--mono); font-size:11px; color:var(--muted)">${cnt}/${all}${st.ts?' · zuletzt '+st.ts:''}</span>
+      </div>
+    </div>`;
+  });
+
+  h+=`<div class="callout warn"><span class="lbl">Grenze der Routine</span>Wenn die Vorbereitung länger dauert als geplant, ist sie zur Beschäftigung geworden. Fünf Minuten Kalender-Check plus eine Wochenstunde reichen aus. Alles darüber verbessert nicht die Entscheidung, sondern nur das Gefühl, vorbereitet zu sein.</div>`;
+
+  host.innerHTML=h;
+  host.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.r, i=+b.dataset.i;
+    const st=S.routine[id]||{done:[],ts:null};
+    st.done = st.done.includes(i) ? st.done.filter(x=>x!==i) : [...st.done, i];
+    st.ts = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+    S.routine[id]=st; save(); renderRoutine(); go('routine');
+  });
+  host.querySelectorAll('[data-reset]').forEach(b=>b.onclick=()=>{
+    S.routine[b.dataset.reset]={done:[],ts:null}; save(); renderRoutine(); go('routine');
+  });
+}
+renderRoutine();
+
+/* --- Reset --- */
+$('#resetLink').onclick=()=>{
+  if(confirm('Fortschritt, Quiz-Ergebnisse und erfasste COT-Werte löschen?')){
+    localStorage.removeItem(KEY); location.reload();
+  }
+};
+go('motor');
+</script>
+</body>
+</html>
